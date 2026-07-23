@@ -41,7 +41,7 @@
       border: 2px dashed #CBD5E1;
       background: #F8FAFC;
       border-radius: 20px;
-      padding: 28px;
+      padding: 32px;
       text-align: center;
       cursor: pointer;
       position: relative;
@@ -50,23 +50,18 @@
     .upload-zone input[type="file"] { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 
     .status-badge { display: inline-block; padding: 6px 16px; border-radius: 50px; background-color: var(--badge-success-bg); color: var(--badge-success-text); font-size: 12px; font-weight: 700; }
-    .btn-primary { background: var(--aeris-primary); color: #FFFFFF; border: none; padding: 12px 24px; border-radius: 50px; font-weight: 700; font-size: 14px; cursor: pointer; transition: 0.2s; }
-    .btn-primary:hover { background: var(--aeris-hover); }
-    .btn-outline { background: transparent; color: var(--aeris-primary); border: 2px solid var(--aeris-primary); padding: 12px 24px; border-radius: 50px; font-weight: 700; font-size: 14px; cursor: pointer; transition: 0.2s; }
-    .btn-outline:hover { background: #FFF5F5; }
-
-    .action-buttons { display: flex; gap: 12px; }
+    .btn-primary { background: var(--aeris-primary); color: #FFFFFF; border: none; padding: 12px 24px; border-radius: 50px; font-weight: 700; font-size: 14px; cursor: pointer; }
+    .btn-outline { background: transparent; color: var(--aeris-primary); border: 2px solid var(--aeris-primary); padding: 12px 24px; border-radius: 50px; font-weight: 700; font-size: 14px; cursor: pointer; }
 
     .preview-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
     .preview-table th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); padding: 12px 16px; border-bottom: 2px solid #F1F5F9; text-align: left; }
     .preview-table td { padding: 14px 16px; font-size: 14px; font-weight: 600; border-bottom: 1px solid #F8FAFC; }
 
-    /* Modal Tambah Baris Manual */
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
-    .modal-content { background: #FFF; padding: 24px; border-radius: 20px; width: 400px; max-width: 90%; box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+    .modal-content { background: #FFF; padding: 28px; border-radius: 20px; width: 420px; max-width: 90%; }
     .form-group { margin-bottom: 16px; }
-    .form-group label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; color: var(--text-dark); }
-    .form-group input { width: 100%; padding: 10px; border: 1px solid #CBD5E1; border-radius: 8px; font-family: inherit; }
+    .form-group label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+    .form-group input { width: 100%; padding: 10px 14px; border: 1px solid #CBD5E1; border-radius: 10px; }
 
     #print-picking-area { display: none; }
 
@@ -87,18 +82,18 @@
   <div class="app-container">
     <header class="header-section">
       <h1 class="brand-title">AERIS FULFILLMENT</h1>
-      <p class="sub-title">Automated PDF Invoice Extractor & Picking List Generator</p>
+      <p class="sub-title">Automated GAS OCR PDF Extractor & Picking List Dashboard</p>
     </header>
 
     <div class="bento-grid">
       
-      <!-- 1. FUNGSI UPLOAD PDF -->
+      <!-- UPLOAD AREA -->
       <div class="bento-card col-large">
         <div class="card-label">Upload File PDF Invoice</div>
         <div class="upload-zone">
           <p style="font-weight: 700; color: var(--text-dark); font-size:16px;">Klik atau Tarik File PDF Invoice ke Sini</p>
-          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Format file: PDF Invoice Asli AERIS</p>
-          <input type="file" id="pdfFileInput" accept="application/pdf" onchange="handlePdfUpload(event)">
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Memproses via GAS Cloud OCR Engine</p>
+          <input type="file" id="pdfFileInput" accept="application/pdf" onchange="uploadToGAS(event)">
         </div>
       </div>
 
@@ -114,18 +109,18 @@
 
       <div class="bento-card col-metric-4">
         <div class="card-label">System Status</div>
-        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">SYSTEM READY</span></div>
+        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">READY TO PROCESS</span></div>
       </div>
 
-      <!-- 2. HASIL BACA PDF & 4. TAMBAH MANUAL & 5. PRINT LIST -->
+      <!-- PREVIEW TABLE -->
       <div class="bento-card col-large">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
           <div>
             <div class="card-label">No Invoice Reference</div>
             <h3 id="invoiceNoHeader" style="color: var(--text-dark); font-size: 18px;">-</h3>
           </div>
-          <div class="action-buttons">
-            <button class="btn-outline" onclick="openManualModal()">+ Tambah Baris Manual</button>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn-outline" onclick="openManualModal()">+ Tambah Item</button>
             <button class="btn-primary" onclick="window.print()">Cetak List Picking</button>
           </div>
         </div>
@@ -139,12 +134,13 @@
                 <th style="text-align: center;">Qty (Beli)</th>
                 <th style="text-align: center;">Qty (Free)</th>
                 <th style="text-align: center;">Total</th>
+                <th style="text-align: center;">Aksi</th>
               </tr>
             </thead>
             <tbody id="previewTbody">
               <tr>
-                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 32px;">
-                  Tabel kosong. Silakan upload PDF atau tambah baris manual.
+                <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 32px;">
+                  Silakan upload PDF Invoice atau tambah item manual.
                 </td>
               </tr>
             </tbody>
@@ -155,12 +151,12 @@
     </div>
   </div>
 
-  <!-- MODAL TAMBAH BARIS MANUAL (SYARAT KE-4) -->
+  <!-- MODAL MANUAL ITEM -->
   <div class="modal-overlay" id="manualModal">
     <div class="modal-content">
       <h3 style="margin-bottom: 16px; color: var(--aeris-primary);">Tambah Item Manual</h3>
       <div class="form-group">
-        <label>Nama Produk</label>
+        <label>Nama / Deskripsi Produk</label>
         <input type="text" id="manualName" placeholder="Contoh: Bubah 2.0 Merlot Complete Set">
       </div>
       <div class="form-group">
@@ -178,7 +174,7 @@
     </div>
   </div>
 
-  <!-- LAYOUT CETAK (SYARAT KE-5) -->
+  <!-- PRINTOUT CONTAINER -->
   <div id="print-picking-area">
     <div class="print-header" id="printInvoiceTitle">RES-INVOICE</div>
     <table class="print-table">
@@ -195,124 +191,60 @@
     </table>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script>
-    if (typeof pdfjsLib !== 'undefined') {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
-    }
+    // MASUKKAN URL WEB APP GOOGLE APPS SCRIPT KAMU DI SINI
+    const GAS_WEB_APP_URL = "URL_WEB_APP_GAS_KAMU";
 
-    // STATE MANAGEMENT UNTUK DATA DASHBOARD
-    let currentInvoiceNo = "INVOICE MANUAL";
-    let globalItems = []; // Simpan semua item (dari PDF + Manual)
+    let currentInvoiceNo = "RES-INVOICE";
+    let globalItems = [];
 
-    // SYARAT 2, 3, & 6: BACA PDF & BEDAKAN HARGA, NAMA, QTY (Y-Coordinate Scanner)
-    async function handlePdfUpload(event) {
+    function uploadToGAS(event) {
       const file = event.target.files[0];
       if (!file) return;
 
-      document.getElementById('uploadStatus').innerText = `Memproses: ${file.name}...`;
-
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-        
-        let allTextItems = [];
-        let rawTextString = "";
-
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          
-          textContent.items.forEach(item => {
-            if (item.str.trim() !== '') {
-              allTextItems.push({
-                text: item.str.trim(),
-                x: item.transform[4],
-                y: item.transform[5] // Posisi vertikal di PDF
-              });
-              rawTextString += item.str + " ";
-            }
-          });
-        }
-
-        // Cari No Invoice
-        let invMatch = rawTextString.match(/RES-[0-9a-zA-Z\/\-\s\(\)]+/i);
-        if (invMatch) {
-          currentInvoiceNo = invMatch[0].split(" Date")[0].split(" Tanggal")[0].split(" INVOICE")[0].trim();
-        }
-
-        // Kelompokkan teks berdasarkan baris (Y)
-        let lines = {};
-        allTextItems.forEach(item => {
-          // Toleransi beda tinggi 4 pixel dianggap 1 baris
-          let yKey = Object.keys(lines).find(y => Math.abs(parseFloat(y) - item.y) < 4.0);
-          if (!yKey) {
-            yKey = item.y.toString();
-            lines[yKey] = [];
-          }
-          lines[yKey].push(item);
-        });
-
-        // Urutkan dari baris atas ke bawah
-        let sortedY = Object.keys(lines).sort((a, b) => parseFloat(b) - parseFloat(a));
-        
-        let extractedProducts = {};
-
-        sortedY.forEach(y => {
-          // Urutkan teks dari kiri ke kanan (X)
-          let rowItems = lines[y].sort((a, b) => a.x - b.x);
-          let rowText = rowItems.map(i => i.text).join(" ");
-
-          // LOGIKA CERDAS: Baris produk biasanya punya Harga (Rp) dan Qty
-          // Contoh: "Bubah 2.0 Merlot 36 Rp 450.000 100%"
-          if (rowText.includes("Rp") && (rowText.includes("%") || rowText.match(/\d/))) {
-            let isFree = rowText.includes("100%"); // Deteksi Qty Free
-            
-            // Ambil Qty: Angka tepat sebelum 'Rp'
-            let qty = 1;
-            let qtyMatch = rowText.match(/\b(\d+)\s+Rp/);
-            if (qtyMatch) qty = parseInt(qtyMatch[1]) || 1;
-
-            // Ambil Nama: Potong teks sebelum Qty dan Rp, buang nomor urut di awal
-            let productName = rowText
-              .replace(/^\d+\s+/, '') // Buang nomor urut "1 ", "2 "
-              .replace(/\s+\d+\s+Rp.*/, '') // Buang Qty dan ke belakangnya
-              .replace(/^(PCS|UNIT|BOX)\s+/i, '')
-              .trim();
-
-            if (productName.length > 3 && !productName.includes("Subtotal") && !productName.includes("Ketentuan")) {
-              if (!extractedProducts[productName]) {
-                extractedProducts[productName] = { desc: productName, qtyBeli: 0, qtyFree: 0 };
-              }
-              if (isFree) {
-                extractedProducts[productName].qtyFree += qty;
-              } else {
-                extractedProducts[productName].qtyBeli += qty;
-              }
-            }
-          }
-        });
-
-        // Timpa data lama dengan data baru dari PDF
-        globalItems = [];
-        for (let key in extractedProducts) {
-          globalItems.push({
-            desc: key,
-            qtyBeli: extractedProducts[key].qtyBeli,
-            qtyFree: extractedProducts[key].qtyFree
-          });
-        }
-
-        renderDashboard();
-        document.getElementById('uploadStatus').innerText = `Berhasil diekstrak!`;
-
-      } catch (err) {
-        console.error(err);
-        alert('Gagal mengekstrak PDF. Pastikan file tidak di-password.');
+      if (GAS_WEB_APP_URL === "URL_WEB_APP_GAS_KAMU") {
+        alert("https://script.google.com/macros/s/AKfycbxjMKosWwfSk66z3wlFyZdHxA_4uKYKBenWAi0a3YuIE-e7D1gsz26RcM0hsfKI4QTQYw/exec");
+        return;
       }
+
+      document.getElementById('uploadStatus').innerText = `Mengunggah ke Cloud OCR... Mohon tunggu sebentar.`;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const base64Data = e.target.result.split(',')[1];
+        
+        const payload = {
+          fileName: file.name,
+          mimeType: file.type,
+          base64: base64Data
+        };
+
+        fetch(GAS_WEB_APP_URL, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(response => {
+          if (response.status === "success") {
+            currentInvoiceNo = response.data.invoiceNo;
+            globalItems = response.data.items;
+            document.getElementById('uploadStatus').innerText = `Berhasil diekstrak via GAS OCR!`;
+            renderDashboard();
+          } else {
+            alert("Gagal membaca PDF: " + response.message);
+            document.getElementById('uploadStatus').innerText = `Gagal diproses.`;
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          alert("Terjadi kesalahan koneksi ke Google Apps Script.");
+          document.getElementById('uploadStatus').innerText = `Gagal terhubung.`;
+        });
+      };
+
+      reader.readAsDataURL(file);
     }
 
-    // SYARAT 4: FUNGSI TAMBAH BARIS MANUAL
     function openManualModal() {
       document.getElementById('manualModal').style.display = 'flex';
       document.getElementById('manualName').value = '';
@@ -329,33 +261,25 @@
       let qtyBeli = parseInt(document.getElementById('manualQtyBeli').value) || 0;
       let qtyFree = parseInt(document.getElementById('manualQtyFree').value) || 0;
 
-      if (!name) {
-        alert("Nama produk tidak boleh kosong!");
-        return;
-      }
-      if (qtyBeli === 0 && qtyFree === 0) {
-        alert("Minimal isi salah satu Qty!");
-        return;
-      }
+      if (!name) { alert("Nama produk wajib diisi!"); return; }
 
-      // Cek apakah item sudah ada di list, kalau ada tambahkan Qty-nya
-      let existingItemIndex = globalItems.findIndex(i => i.desc.toLowerCase() === name.toLowerCase());
-      if (existingItemIndex >= 0) {
-        globalItems[existingItemIndex].qtyBeli += qtyBeli;
-        globalItems[existingItemIndex].qtyFree += qtyFree;
+      let existingIndex = globalItems.findIndex(i => i.desc.toLowerCase() === name.toLowerCase());
+      if (existingIndex >= 0) {
+        globalItems[existingIndex].qtyBeli += qtyBeli;
+        globalItems[existingIndex].qtyFree += qtyFree;
       } else {
-        globalItems.push({
-          desc: name,
-          qtyBeli: qtyBeli,
-          qtyFree: qtyFree
-        });
+        globalItems.push({ desc: name, qtyBeli: qtyBeli, qtyFree: qtyFree });
       }
 
       closeManualModal();
-      renderDashboard(); // Update UI langsung
+      renderDashboard();
     }
 
-    // FUNGSI RENDER KE LAYAR (UI DASHBOARD + UI PRINT)
+    function deleteItem(index) {
+      globalItems.splice(index, 1);
+      renderDashboard();
+    }
+
     function renderDashboard() {
       document.getElementById('invoiceNoHeader').innerText = currentInvoiceNo;
       document.getElementById('printInvoiceTitle').innerText = currentInvoiceNo;
@@ -369,30 +293,31 @@
       let totalUnitSum = 0;
 
       if (globalItems.length === 0) {
-        prevTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:20px;">Tabel kosong.</td></tr>`;
+        prevTbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:24px;">Tabel kosong. Silakan upload PDF Invoice.</td></tr>`;
+        document.getElementById('metricTotalUnit').innerText = '0';
+        document.getElementById('metricSkuTypes').innerText = '0';
         return;
       }
 
       globalItems.forEach((item, index) => {
-        let noUrut = index + 1;
+        let no = index + 1;
         let total = item.qtyBeli + item.qtyFree;
         totalUnitSum += total;
 
-        // Render Dashboard HTML
         prevTbody.innerHTML += `
           <tr>
-            <td>${noUrut}</td>
+            <td>${no}</td>
             <td>${item.desc}</td>
             <td style="text-align: center;">${item.qtyBeli > 0 ? item.qtyBeli : '-'}</td>
             <td style="text-align: center;">${item.qtyFree > 0 ? item.qtyFree : '-'}</td>
             <td style="text-align: center; color: var(--aeris-primary); font-weight:700;">${total}</td>
+            <td style="text-align: center;"><button onclick="deleteItem(${index})" style="background:none; border:none; color:red; cursor:pointer; font-weight:bold;">Hapus</button></td>
           </tr>
         `;
 
-        // Render Cetak Kertas (Syarat No.5)
         printTbody.innerHTML += `
           <tr>
-            <td class="text-center">${noUrut}</td>
+            <td class="text-center">${no}</td>
             <td>${item.desc}</td>
             <td class="text-center">${item.qtyBeli > 0 ? item.qtyBeli : ''}</td>
             <td class="text-center">${item.qtyFree > 0 ? item.qtyFree : ''}</td>
