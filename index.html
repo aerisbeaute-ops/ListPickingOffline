@@ -94,7 +94,7 @@
         <div class="card-label">UPLOAD FILE PDF INVOICE</div>
         <div class="upload-zone">
           <p style="font-weight: 700; color: var(--text-dark); font-size:16px;">Klik atau Tarik File PDF Invoice ke Sini</p>
-          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Memproses PDF secara cepat & lokal</p>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Memproses PDF secara presisi & lokal</p>
           <input type="file" id="pdfFileInput" accept="application/pdf" onchange="processPDFLocally(event)">
         </div>
       </div>
@@ -227,7 +227,7 @@
           });
         }
 
-        parseAerisFinalFix(allLines);
+        parseAerisUltraClean(allLines);
         document.getElementById('uploadStatus').innerText = `Selesai: ${file.name}`;
 
       } catch (err) {
@@ -236,14 +236,14 @@
       }
     }
 
-    function parseAerisFinalFix(lines) {
+    function parseAerisUltraClean(lines) {
       let fullText = lines.join("\n");
 
-      // 1. Ambil Nomor Invoice
-      let invMatch = fullText.match(/RES-[0-9a-zA-Z\/\-\.\_\(\)]+/i);
+      // 1. Tangkap Nomor Invoice / PO Lengkap
+      let invMatch = fullText.match(/RES-[^\s\n\r]+/i);
       currentInvoiceNo = invMatch ? invMatch[0].trim() : "RES-INVOICE";
 
-      // 2. Isolasi Tabel Produk
+      // 2. Isolasi Tabel Produk (Abaikan Header Alamat & Footer Total/Terbilang)
       let inTable = false;
       let tableLines = [];
 
@@ -255,7 +255,15 @@
           return;
         }
 
-        if (l.includes("subtotal") || l.includes("total amount") || l.includes("terbilang") || l.includes("ketentuan") || l.includes("diterima")) {
+        // Hentikan tabel jika ketemu kata-kata footer
+        if (
+          l.includes("subtotal") || 
+          l.includes("total amount") || 
+          l.includes("terbilang") || 
+          l.includes("ketentuan") || 
+          l.includes("diterima") || 
+          l.startsWith("total ")
+        ) {
           inTable = false;
           return;
         }
@@ -265,47 +273,46 @@
         }
       });
 
-      // 3. PARSING TERTIB TANPA TERTANGKAP BARCODE
+      // 3. PARSING PRODUK BERSIH MURNI
       let parsedProducts = [];
       let currentItem = null;
 
       tableLines.forEach(line => {
         let l = line.toLowerCase();
-        if (l.includes("page") || l.startsWith("total")) return;
+        if (l.includes("page") || l.startsWith("total ")) return;
 
         let hasPercent = line.includes("%");
         let hasRp = l.includes("rp");
 
-        // HAPUS TOTAL BARCODE (Angka 8-14 digit seperti 8994449502480) & NOMINAL HARGA KETAT
+        // Pembersihan Barcode, Simbol Aneh (%, γ, --), dan Format Rp
         let cleanLine = line
-          .replace(/\b\d{8,14}\b/g, '')               // BUANG BARCODE/EAN13
+          .replace(/\b\d{8,14}\b/g, '')               // Buang Barcode/EAN13
           .replace(/[\-\–\—]+\s*Rp\s*[\-\–\—]+/gi, '') 
           .replace(/\bRp\.?\s*[\d\.\,]+/gi, '')       
-          .replace(/[\-\–\—]{2,}/g, '')               
+          .replace(/[%γ\-\–\—]/g, ' ')                // Buang %, γ, dan strip
+          .replace(/\s+/g, ' ')                       
           .trim();
 
-        // Cari Angka QTY Murni (1 - 3 digit: 1 s/d 999)
+        // Cari Angka QTY Murni
         let numbers = cleanLine.match(/\b([1-9]\d{0,2})\b/g);
         let validQty = null;
 
         if (numbers) {
-          let candidates = numbers.map(n => parseInt(n)).filter(n => n > 0 && n < 500);
+          let candidates = numbers.map(n => parseInt(n)).filter(n => n > 0 && n < 300);
           if (candidates.length > 0) {
             validQty = candidates[0]; // Ambil Qty asli
           }
         }
 
-        // Kriteria Baris Utama
+        // Kriteria Baris Utama Produk
         if (validQty !== null && (hasPercent || hasRp)) {
           if (currentItem) parsedProducts.push(currentItem);
 
-          let isFree = cleanLine.includes("100%");
+          let isFree = line.includes("100%");
 
           let descText = cleanLine
             .replace(/^\d+[\s\.\-]+/, '')            // Buang nomor urut awal
             .replace(/\b[1-9]\d{0,2}\b/g, '')         // Buang angka Qty
-            .replace(/\d+%/g, '')                    // Buang %
-            .replace(/[\-\–\—]+/g, ' ')               
             .replace(/\s+/g, ' ')                    
             .trim();
 
@@ -316,16 +323,14 @@
           };
         } 
         else {
-          // Baris Sambungan Nama Produk
+          // Baris Sambungan Nama Produk di bawahnya
           let subText = cleanLine
             .replace(/^\d+[\s\.\-]+/, '')
             .replace(/\b[1-9]\d{0,2}\b/g, '')
-            .replace(/\d+%/g, '')
-            .replace(/[\-\–\—]+/g, ' ')
             .replace(/\s+/g, ' ')
             .trim();
 
-          if (currentItem && subText.length > 0 && !subText.toLowerCase().includes("terbilang")) {
+          if (currentItem && subText.length > 0 && !subText.toLowerCase().includes("total") && !subText.toLowerCase().includes("terbilang")) {
             currentItem.desc += " " + subText;
           }
         }
@@ -333,14 +338,18 @@
 
       if (currentItem) parsedProducts.push(currentItem);
 
-      // 4. GROUPING FINAL
+      // 4. GROUPING FINAL & STERILISASI NAMA PRODUK
       let grouped = {};
 
       parsedProducts.forEach(p => {
         let name = p.desc
           .replace(/\bRp\b/gi, '')
+          .replace(/[%γ\-\–\—]/g, ' ')
           .replace(/\s+/g, ' ')
           .trim();
+
+        // Singkirkan baris "Total Lima Belas Juta..." yang tidak sengaja lolos
+        if (name.toLowerCase().startsWith("total ")) return;
 
         if (name.length > 2) {
           if (!grouped[name]) {
