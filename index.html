@@ -1,8 +1,377 @@
-<script>
-    // Setup PDF.js Worker
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AERIS Fulfillment SaaS Dashboard</title>
+  
+  <!-- Font Modern Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- PDF.js Library untuk Parse File PDF di Browser -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+  <style>
+    :root {
+      --aeris-primary: #701403;
+      --aeris-hover: #540e02;
+      --bg-main: #F3F5F9;
+      --bg-surface: #FFFFFF;
+      --text-dark: #1E293B;
+      --text-muted: #64748B;
+      --shadow-soft: 0 10px 25px rgba(0, 0, 0, 0.03);
+      --shadow-hover: 0 15px 30px rgba(112, 20, 3, 0.08);
+      --badge-success-bg: #E6F4EA;
+      --badge-success-text: #137333;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-dark);
+      padding: 32px 20px;
+      min-height: 100vh;
+    }
+
+    .app-container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .header-section {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .brand-title {
+      color: var(--aeris-primary);
+      font-weight: 800;
+      font-size: 28px;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+
+    .sub-title {
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    /* Bento Grid */
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 20px;
+    }
+
+    .bento-card {
+      background: var(--bg-surface);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: var(--shadow-soft);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .bento-card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-hover);
+    }
+
+    .card-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .metric-value {
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--text-dark);
+      line-height: 1.1;
+    }
+
+    .icon-svg {
+      width: 18px;
+      height: 18px;
+      stroke: var(--aeris-primary);
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .col-large { grid-column: span 12; }
+    .col-metric-4 { grid-column: span 4; }
+
+    /* Upload Drag & Drop Zone */
+    .upload-zone {
+      border: 2px dashed #CBD5E1;
+      background: #F8FAFC;
+      border-radius: 20px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .upload-zone:hover {
+      border-color: var(--aeris-primary);
+      background: #FFF5F5;
+    }
+
+    .upload-zone input[type="file"] {
+      position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .upload-icon {
+      width: 32px; height: 32px;
+      stroke: var(--aeris-primary);
+      margin-bottom: 8px;
+    }
+
+    /* Status Badge */
+    .status-badge {
+      display: inline-block;
+      padding: 6px 16px;
+      border-radius: 50px;
+      background-color: var(--badge-success-bg);
+      color: var(--badge-success-text);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .btn-primary {
+      background: var(--aeris-primary);
+      color: #FFFFFF;
+      border: none;
+      padding: 14px 28px;
+      border-radius: 50px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 4px 12px rgba(112, 20, 3, 0.2);
+    }
+
+    .btn-primary:hover {
+      background: var(--aeris-hover);
+    }
+
+    /* Table Dashboard Preview */
+    .preview-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 16px;
+    }
+
+    .preview-table th {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      padding: 12px 16px;
+      border-bottom: 2px solid #F1F5F9;
+      text-align: left;
+    }
+
+    .preview-table td {
+      padding: 14px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      border-bottom: 1px solid #F8FAFC;
+    }
+
+    /* CSS PRINT DRIVER OVERRIDE */
+    #print-picking-area {
+      display: none;
+    }
+
+    @media print {
+      body * {
+        visibility: hidden !important;
+      }
+
+      #print-picking-area, #print-picking-area * {
+        visibility: visible !important;
+      }
+
+      #print-picking-area {
+        display: block !important;
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        background: #fff !important;
+        color: #000 !important;
+      }
+
+      .print-header {
+        border: 1.5px solid #000;
+        text-align: center;
+        font-weight: bold;
+        font-size: 14pt;
+        padding: 6px;
+        margin-bottom: -1.5px;
+      }
+
+      .print-table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        display: table !important;
+      }
+
+      .print-table tr {
+        display: table-row !important;
+      }
+
+      .print-table th, .print-table td {
+        display: table-cell !important;
+        border: 1.5px solid #000 !important;
+        padding: 6px 8px !important;
+        font-size: 10pt !important;
+        color: #000 !important;
+        font-family: Arial, sans-serif !important;
+      }
+
+      .text-center { text-align: center !important; }
+      .text-right { text-align: right !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    <header class="header-section">
+      <h1 class="brand-title">AERIS FULFILLMENT</h1>
+      <p class="sub-title">Automated PDF Invoice Extractor & Picking List Generator</p>
+    </header>
+
+    <div class="bento-grid">
+      
+      <!-- UPLOAD PDF INVOICE CARD -->
+      <div class="bento-card col-large">
+        <div class="card-label">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          Upload File PDF Invoice
+        </div>
+        <div class="upload-zone">
+          <svg class="upload-icon" viewBox="0 0 24 24" fill="none"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 0115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <p style="font-weight: 700; color: var(--text-dark);">Klik atau Tarik File PDF Invoice ke Sini</p>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Format file support: PDF Asli Invoice AERIS</p>
+          <input type="file" id="pdfFileInput" accept="application/pdf" onchange="handlePdfUpload(event)">
+        </div>
+      </div>
+
+      <!-- METRICS -->
+      <div class="bento-card col-metric-4">
+        <div class="card-label">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+          Total Unit Item
+        </div>
+        <div class="metric-value" id="metricTotalUnit">0</div>
+      </div>
+
+      <div class="bento-card col-metric-4">
+        <div class="card-label">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          Variasi SKU
+        </div>
+        <div class="metric-value" id="metricSkuTypes">0</div>
+      </div>
+
+      <div class="bento-card col-metric-4">
+        <div class="card-label">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          System Readiness
+        </div>
+        <div style="margin-top: 8px;">
+          <span class="status-badge" id="sysStatus">WAITING FOR PDF</span>
+        </div>
+      </div>
+
+      <!-- PREVIEW TABLE CARD -->
+      <div class="bento-card col-large">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div>
+            <div class="card-label">
+              <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              No Invoice Reference
+            </div>
+            <h3 id="invoiceNoHeader" style="color: var(--text-dark); font-size: 18px;">-</h3>
+          </div>
+          <button class="btn-primary" onclick="window.print()">
+            <svg class="icon-svg" viewBox="0 0 24 24" style="stroke:#fff;"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Print List Picking
+          </button>
+        </div>
+
+        <div style="overflow-x: auto;">
+          <table class="preview-table">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Deskripsi Produk</th>
+                <th style="text-align: center;">Qty (Beli)</th>
+                <th style="text-align: center;">Qty (Free)</th>
+                <th style="text-align: center;">Total</th>
+              </tr>
+            </thead>
+            <tbody id="previewTbody">
+              <tr>
+                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 32px;">
+                  Silakan upload file PDF Invoice terlebih dahulu untuk memproses data.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CONTAINER CETAK / PRINTOUT -->
+  <div id="print-picking-area">
+    <div class="print-header" id="printInvoiceTitle">RES-01/210726/TD-INTIMAKEUP (PKU)</div>
+    <table class="print-table">
+      <thead>
+        <tr>
+          <th style="width: 5%;" class="text-center">No.</th>
+          <th style="width: 65%;">Deskripsi Produk</th>
+          <th style="width: 10%;" class="text-center">Qty (Beli)</th>
+          <th style="width: 10%;" class="text-center">Qty (Free)</th>
+          <th style="width: 10%;" class="text-center">total</th>
+        </tr>
+      </thead>
+      <tbody id="printTbody">
+      </tbody>
+    </table>
+  </div>
+
+  <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    // Handle Upload PDF
     async function handlePdfUpload(event) {
       const file = event.target.files[0];
       if (!file || file.type !== 'application/pdf') {
@@ -19,12 +388,10 @@
         let allItems = [];
         let fullRawText = "";
 
-        // Loop seluruh halaman PDF
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
           const textContent = await page.getTextContent();
           
-          // Gabungkan teks dengan koordinat presisi
           let pageItems = textContent.items.map(item => ({
             str: item.str,
             x: item.transform[4],
@@ -44,22 +411,18 @@
       }
     }
 
-    // Parser Khusus Template Invoice AERIS
     function parseAerisPdfInvoice(textItems, rawText) {
-      // 1. Ekstrak Nomor Invoice Lengkap (Mendukung format dengan tanda kurung / spasi)
       let invoiceNo = "RES-INVOICE";
       let invoiceMatch = rawText.match(/RES-[\w\d\/-]+(?:\([^)]+\)|[^\s\n]+)*/i);
       if (invoiceMatch) {
         invoiceNo = invoiceMatch[0].trim();
       }
 
-      // 2. Kelompokkan Teks Berdasarkan Baris Y (Toleransi 3px untuk multiline)
       let rowGroups = {};
       textItems.forEach(item => {
         let str = item.str.trim();
         if (!str) return;
 
-        // Cari Y group terdekat
         let yKey = Object.keys(rowGroups).find(y => Math.abs(parseFloat(y) - item.y) < 3.5);
         if (!yKey) {
           yKey = item.y.toString();
@@ -68,33 +431,26 @@
         rowGroups[yKey].push(item);
       });
 
-      // Urutkan Baris dari Atas ke Bawah
       let sortedYKeys = Object.keys(rowGroups).sort((a, b) => parseFloat(b) - parseFloat(a));
 
       let rawRows = [];
       sortedYKeys.forEach(y => {
-        // Urutkan kata dari Kiri ke Kanan berdasarkan X
         let itemsInRow = rowGroups[y].sort((a, b) => a.x - b.x);
         let lineText = itemsInRow.map(i => i.str).join(" ").trim();
         if (lineText) rawRows.push(lineText);
       });
 
-      // 3. Ekstrak & Grouping Produk (Qty Beli vs Qty Free)
       let groupedProducts = {};
 
       for (let i = 0; i < rawRows.length; i++) {
         let line = rawRows[i];
 
-        // Abaikan Catatan Ketentuan Pembayaran / Syarat Retur di bagian bawah PDF
         if (line.includes("Ketentuan Pembayaran") || line.includes("Terbilang:") || line.includes("Syarat dan Ketentuan")) {
           break;
         }
 
-        // Cek apakah baris ini memuat data item (memiliki penanda Diskon % atau format Rp)
         if (line.includes("%")) {
           let isFree = line.includes("100%");
-
-          // Cari nilai Qty (Angka pertama setelah nomor urut)
           let matchQty = line.match(/^\d+\s+([\s\S]+?)\s+(\d+)\s+Rp/);
           
           let desc = "";
@@ -104,11 +460,9 @@
             desc = matchQty[1].trim();
             qty = parseInt(matchQty[2]) || 0;
           } else {
-            // Pembersihan alternatif regex jika struktur sedikit bergeser
             let parts = line.split(/\s+/);
-            if (!isNaN(parts[0])) parts.shift(); // Hapus nomor urut depan
+            if (!isNaN(parts[0])) parts.shift();
             
-            // Ambil Qty sebelum kata 'Rp'
             let rpIndex = parts.findIndex(p => p.includes("Rp"));
             if (rpIndex > 1) {
               qty = parseInt(parts[rpIndex - 1]) || 1;
@@ -116,10 +470,8 @@
             }
           }
 
-          // Bersihkan sisa karakter aneh/harga yang mungkin tersisa di nama deskripsi
           desc = desc.replace(/-?\s*Rp.*/i, '').replace(/\b\d+\s*$/, '').trim();
 
-          // Jika nama deskripsi terpotong di baris sebelumnya (multi-line), gabungkan
           if (i > 0 && !rawRows[i-1].includes("%") && !rawRows[i-1].includes("INVOICE") && !rawRows[i-1].includes("No")) {
             let prevText = rawRows[i-1].trim();
             if (!prevText.match(/^\d+$/) && !prevText.includes("AERIS") && !prevText.includes("Toko")) {
@@ -141,7 +493,6 @@
         }
       }
 
-      // 4. Konversi ke Format Final Array
       let finalItems = [];
       let index = 1;
 
@@ -154,11 +505,9 @@
         });
       }
 
-      // Render Hasil ke UI
       updateDashboardUI(invoiceNo, finalItems);
     }
 
-    // Render Data ke Tampilan Dashboard & Cetak
     function updateDashboardUI(invoiceNo, items) {
       document.getElementById('invoiceNoHeader').innerText = invoiceNo;
       document.getElementById('printInvoiceTitle').innerText = invoiceNo;
@@ -177,7 +526,6 @@
         let total = item.qtyBeli + item.qtyFree;
         totalUnitSum += total;
 
-        // Row Dashboard
         prevTbody.innerHTML += `
           <tr>
             <td>${item.no}</td>
@@ -188,7 +536,6 @@
           </tr>
         `;
 
-        // Row Printout (Tabel Bersisian Sempurna)
         printTbody.innerHTML += `
           <tr>
             <td class="text-center">${item.no}</td>
@@ -204,3 +551,5 @@
       document.getElementById('metricSkuTypes').innerText = items.length;
     }
   </script>
+</body>
+</html>
