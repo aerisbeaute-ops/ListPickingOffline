@@ -9,6 +9,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
+  <!-- PDF.js Engine dari Mozilla -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
   <style>
     :root {
       --aeris-primary: #701403;
@@ -83,7 +86,7 @@
   <div class="app-container">
     <header class="header-section">
       <h1 class="brand-title">AERIS FULFILLMENT</h1>
-      <p class="sub-title">Automated PDF Invoice Extractor & Picking List Generator</p>
+      <p class="sub-title">Client-Side Native PDF Invoice Extractor & Picking List Generator</p>
     </header>
 
     <div class="bento-grid">
@@ -92,8 +95,8 @@
         <div class="card-label">UPLOAD FILE PDF INVOICE</div>
         <div class="upload-zone">
           <p style="font-weight: 700; color: var(--text-dark); font-size:16px;">Klik atau Tarik File PDF Invoice ke Sini</p>
-          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Memproses via Cloud OCR Engine</p>
-          <input type="file" id="pdfFileInput" accept="application/pdf" onchange="uploadToGAS(event)">
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Memproses secara lokal di browser</p>
+          <input type="file" id="pdfFileInput" accept="application/pdf" onchange="processPDFLocally(event)">
         </div>
       </div>
 
@@ -109,7 +112,7 @@
 
       <div class="bento-card col-metric-4">
         <div class="card-label">SYSTEM STATUS</div>
-        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">SYSTEM READY</span></div>
+        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">LOCAL ENGINE READY</span></div>
       </div>
 
       <div class="bento-card col-large">
@@ -189,57 +192,122 @@
   </div>
 
   <script>
-    // LINK URL GAS RESMI KAMU
-    const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxjMKosWwfSk66z3wlFyZdHxA_4uKYKBenWAi0a3YuIE-e7D1gsz26RcM0hsfKI4QTQYw/exec";
+    // Inisialisasi PDF.js Worker
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
     let currentInvoiceNo = "-";
     let globalItems = [];
 
-    function uploadToGAS(event) {
+    async function processPDFLocally(event) {
       const file = event.target.files[0];
       if (!file) return;
 
-      document.getElementById('uploadStatus').innerText = `Mengunggah ${file.name}... Mohon tunggu.`;
+      document.getElementById('uploadStatus').innerText = `Membaca ${file.name}...`;
 
-      const reader = new FileReader();
-      reader.onload = function(e) {
-        const base64Data = e.target.result.split(',')[1];
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         
-        const payload = {
-          fileName: file.name,
-          mimeType: file.type,
-          base64: base64Data
-        };
+        let extractedLines = [];
 
-        fetch(GAS_WEB_APP_URL, {
-          method: 'POST',
-          mode: 'cors',
-          redirect: 'follow',
-          headers: {
-            'Content-Type': 'text/plain;charset=utf-8'
-          },
-          body: JSON.stringify(payload)
-        })
-        .then(res => res.json())
-        .then(response => {
-          if (response.status === "success") {
-            currentInvoiceNo = response.data.invoiceNo || "-";
-            globalItems = response.data.items || [];
-            document.getElementById('uploadStatus').innerText = `Berhasil memuat: ${file.name}`;
-            renderDashboard();
-          } else {
-            document.getElementById('uploadStatus').innerText = `Gagal mengekstrak teks PDF.`;
-            renderError("Data tidak ditemukan. Pastikan file adalah Invoice resmi AERIS.");
+        // Loop setiap halaman di PDF
+        for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+          const page = await pdf.getPage(pageNum);
+          const textContent = await page.getTextContent();
+          
+          // Kelompokkan karakter berdasarkan posisi Y (koordinat baris di PDF)
+          let linesByY = {};
+          textContent.items.forEach(item => {
+            let y = Math.round(item.transform[5]); // Koordinat vertikal
+            if (!linesByY[y]) linesByY[y] = [];
+            linesByY[y].push(item.str);
+          });
+
+          // Urutkan baris dari atas ke bawah
+          let sortedY = Object.keys(linesByY).sort((a, b) => b - a);
+          sortedY.forEach(y => {
+            let lineText = linesByY[y].join(" ").trim();
+            if (lineText.length > 0) {
+              extractedLines.push(lineText);
+            }
+          });
+        }
+
+        // Teks utuh hasil ekstraksi
+        parseAerisNative(extractedLines);
+        document.getElementById('uploadStatus').innerText = `Selesai mengekstrak: ${file.name}`;
+
+      } catch (err) {
+        console.error(err);
+        document.getElementById('uploadStatus').innerText = `Gagal membaca file PDF.`;
+        renderError("Gagal memproses file. Pastikan PDF tidak terkunci kata sandi.");
+      }
+    }
+
+    function parseAerisNative(lines) {
+      let fullText = lines.join("\n");
+
+      // 1. Ambil No Invoice secara utuh (RES-01/210726/TD dst)
+      let invMatch = fullText.match(/RES-[0-9a-zA-Z\/\-\.\_\(\)]+/i);
+      if (invMatch) {
+        currentInvoiceNo = invMatch[0].trim();
+      } else {
+        currentInvoiceNo = "RES-INVOICE";
+      }
+
+      let groupedProducts = {};
+
+      // 2. Loop setiap baris teks untuk memilah item & Qty
+      lines.forEach(line => {
+        let l = line.toLowerCase();
+        
+        // Abaikan baris header, total, dan catatan
+        if (line.length < 4 || l.includes("invoice") || l.includes("subtotal") || l.includes("total") || l.includes("ketentuan") || l.includes("diterima")) {
+          return;
+        }
+
+        // Jika baris berisi angka (Kemungkinan SKU + Qty)
+        if (/\d/.test(line)) {
+          let isFree = l.includes("100%") || l.includes("free") || l.includes("hadiah");
+
+          // Ekstrak angka Qty yang berdiri sendiri
+          let numbers = line.match(/\b([1-9]\d*)\b/g);
+          let qty = 1;
+          
+          if (numbers) {
+            // Ambil angka terkecil yang masuk akal sebagai Qty (bukan ID/Tahun)
+            let validQtys = numbers.map(n => parseInt(n)).filter(n => n > 0 && n < 500);
+            if (validQtys.length > 0) {
+              qty = validQtys[0];
+            }
           }
-        })
-        .catch(err => {
-          console.error(err);
-          document.getElementById('uploadStatus').innerText = `Gagal terhubung ke Cloud Engine.`;
-          renderError("Koneksi diblokir. Pastikan Deployment Apps Script di-set 'Anyone'.");
-        });
-      };
 
-      reader.readAsDataURL(file);
+          // Bersihkan deskripsi produk dari angka-angka sampah
+          let cleanDesc = line
+            .replace(/^[\d\s\.\-]+/, '')              // Buang No urut awal
+            .replace(/Rp\.?\s*[\d\.\,]+/gi, '')       // Buang nominal Rp
+            .replace(/\d+%/g, '')                    // Buang %
+            .replace(/---\s*\d*/g, '')               // Buang separator ---
+            .replace(/\b([1-9]\d*)\b/g, '')          // Buang angka terpisah
+            .replace(/\s+/g, ' ')                    // Rapikan spasi
+            .trim();
+
+          if (cleanDesc.length > 3) {
+            if (!groupedProducts[cleanDesc]) {
+              groupedProducts[cleanDesc] = { desc: cleanDesc, qtyBeli: 0, qtyFree: 0 };
+            }
+
+            if (isFree) {
+              groupedProducts[cleanDesc].qtyFree += qty;
+            } else {
+              groupedProducts[cleanDesc].qtyBeli += qty;
+            }
+          }
+        }
+      });
+
+      globalItems = Object.values(groupedProducts);
+      renderDashboard();
     }
 
     function openManualModal() {
