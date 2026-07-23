@@ -20,8 +20,6 @@
       --shadow-soft: 0 10px 25px rgba(0, 0, 0, 0.03);
       --badge-success-bg: #E6F4EA;
       --badge-success-text: #137333;
-      --badge-error-bg: #FCE8E6;
-      --badge-error-text: #C5221F;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
@@ -191,7 +189,7 @@
   </div>
 
   <script>
-    // URL WEB APP GAS RESMI
+    // LINK URL GAS RESMI KAMU
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxjMKosWwfSk66z3wlFyZdHxA_4uKYKBenWAi0a3YuIE-e7D1gsz26RcM0hsfKI4QTQYw/exec";
 
     let currentInvoiceNo = "-";
@@ -201,7 +199,7 @@
       const file = event.target.files[0];
       if (!file) return;
 
-      document.getElementById('uploadStatus').innerText = `Sedang mengekstrak file ${file.name}... Mohon tunggu.`;
+      document.getElementById('uploadStatus').innerText = `Mengunggah ${file.name}... Mohon tunggu.`;
 
       const reader = new FileReader();
       reader.onload = function(e) {
@@ -215,6 +213,11 @@
 
         fetch(GAS_WEB_APP_URL, {
           method: 'POST',
+          mode: 'cors',
+          redirect: 'follow',
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8'
+          },
           body: JSON.stringify(payload)
         })
         .then(res => res.json())
@@ -232,6 +235,7 @@
         .catch(err => {
           console.error(err);
           document.getElementById('uploadStatus').innerText = `Gagal terhubung ke Cloud Engine.`;
+          renderError("Koneksi diblokir. Pastikan Deployment Apps Script di-set 'Anyone'.");
         });
       };
 
