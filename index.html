@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AERIS Fulfillment SaaS Dashboard</title>
+  
+  <!-- Font Modern Plus Jakarta Sans -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    /* CSS Variables & Color Palette */
+    :root {
+      --aeris-primary: #701403;
+      --aeris-hover: #540e02;
+      --bg-main: #F3F5F9;
+      --bg-surface: #FFFFFF;
+      --text-dark: #1E293B;
+      --text-muted: #64748B;
+      --shadow-soft: 0 10px 25px rgba(0, 0, 0, 0.03);
+      --shadow-hover: 0 15px 30px rgba(112, 20, 3, 0.08);
+      --badge-success-bg: #E6F4EA;
+      --badge-success-text: #137333;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-main);
+      color: var(--text-dark);
+      padding: 32px 20px;
+      min-height: 100vh;
+    }
+
+    /* Container Principal */
+    .app-container {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    /* Header Section (Center Aligned) */
+    .header-section {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .brand-title {
+      color: var(--aeris-primary);
+      font-weight: 800;
+      font-size: 28px;
+      letter-spacing: -0.5px;
+      margin-bottom: 6px;
+    }
+
+    .sub-title {
+      color: var(--text-muted);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    /* Bento Grid System */
+    .bento-grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 20px;
+    }
+
+    /* Card Base Style */
+    .bento-card {
+      background: var(--bg-surface);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: var(--shadow-soft);
+      transition: transform 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .bento-card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-hover);
+    }
+
+    /* Typography Hierarchy Helpers */
+    .card-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .metric-value {
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--text-dark);
+      line-height: 1.1;
+    }
+
+    /* SVG Line-Art Icon Style */
+    .icon-svg {
+      width: 18px;
+      height: 18px;
+      stroke: var(--aeris-primary);
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    /* Input Form Raksasa */
+    .col-large-input {
+      grid-column: span 12;
+    }
+
+    .giant-input-wrapper {
+      background: #F8FAFC;
+      border-radius: 20px;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .giant-input-wrapper:focus-within {
+      background: #FFFFFF;
+      box-shadow: 0 0 0 3px rgba(112, 20, 3, 0.15);
+    }
+
+    .giant-input {
+      width: 100%;
+      border: none;
+      background: transparent;
+      outline: none;
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-dark);
+      text-align: center;
+    }
+
+    .giant-input::placeholder {
+      color: #94A3B8;
+      font-weight: 400;
+    }
+
+    /* Metrics Cards */
+    .col-metric-4 { grid-column: span 4; }
+    .col-metric-8 { grid-column: span 8; }
+
+    /* Custom Badge Pill */
+    .status-badge {
+      display: inline-block;
+      padding: 6px 16px;
+      border-radius: 50px;
+      background-color: var(--badge-success-bg);
+      color: var(--badge-success-text);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    /* Primary Action Button */
+    .btn-primary {
+      background: var(--aeris-primary);
+      color: #FFFFFF;
+      border: none;
+      padding: 14px 28px;
+      border-radius: 50px;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      transition: background-color 0.2s ease, transform 0.2s ease;
+      box-shadow: 0 4px 12px rgba(112, 20, 3, 0.2);
+    }
+
+    .btn-primary:hover {
+      background: var(--aeris-hover);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary .icon-svg {
+      stroke: #FFFFFF;
+    }
+
+    /* Preview Table Inside Dashboard */
+    .table-container {
+      margin-top: 16px;
+      overflow-x: auto;
+    }
+
+    .preview-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .preview-table th {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      padding: 12px 16px;
+      border-bottom: 2px solid #F1F5F9;
+    }
+
+    .preview-table td {
+      padding: 14px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      border-bottom: 1px solid #F8FAFC;
+    }
+
+    /* PRINT HIDDEN REGION */
+    #print-picking-area {
+      display: none;
+    }
+
+    /* CSS PRINT DRIVER OVERRIDE (Output Hemat Tinta/Monochrome Sesuai Format Gudang) */
+    @media print {
+      body * {
+        visibility: hidden;
+      }
+
+      #print-picking-area, #print-picking-area * {
+        visibility: visible;
+        display: block;
+      }
+
+      #print-picking-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        color: #000;
+        background: #fff;
+        padding: 0;
+      }
+
+      .picking-title {
+        text-align: center;
+        font-size: 14pt;
+        font-weight: bold;
+        padding: 8px 0;
+        border: 1.5px solid #000;
+        margin-bottom: 0;
+      }
+
+      .print-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .print-table th, .print-table td {
+        border: 1.5px solid #000;
+        padding: 6px 8px;
+        font-size: 10pt;
+        color: #000;
+        font-family: Arial, sans-serif;
+      }
+
+      .text-center { text-align: center; }
+      .text-right { text-align: right; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- HEADER SECTION -->
+    <header class="header-section">
+      <h1 class="brand-title">AERIS FULFILLMENT</h1>
+      <p class="sub-title">Automated Invoice Extractor & Picking List Generator</p>
+    </header>
+
+    <!-- BENTO GRID SYSTEM -->
+    <div class="bento-grid">
+      
+      <!-- GIANT INPUT SCANNER CARD -->
+      <div class="bento-card col-large-input">
+        <div class="card-label">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M4 7V4h3M20 7V4h-3M4 17v3h3M20 17v3h-3M9 12h6"/></svg>
+          Input / Scan Invoice Reference
+        </div>
+        <div class="giant-input-wrapper">
+          <input type="text" id="invoiceInput" class="giant-input" placeholder="Ketik atau scan nomor invoice di sini..." value="RES-02/250526/MT-LAVISH">
+        </div>
+      </div>
+
+      <!-- METRIC CARD 1: TOTAL ITEM -->
+      <div class="bento-card col-metric-4">
+        <div class="card-label">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+          Total Unit Item
+        </div>
+        <div class="metric-value" id="metricTotalUnit">217</div>
+      </div>
+
+      <!-- METRIC CARD 2: SKU TYPES -->
+      <div class="bento-card col-metric-4">
+        <div class="card-label">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+          Variasi SKU
+        </div>
+        <div class="metric-value" id="metricSkuTypes">21</div>
+      </div>
+
+      <!-- METRIC CARD 3: STATUS -->
+      <div class="bento-card col-metric-4">
+        <div class="card-label">
+          <svg class="icon-svg" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          System Readiness
+        </div>
+        <div style="margin-top: 8px;">
+          <span class="status-badge">READY TO PRINT</span>
+        </div>
+      </div>
+
+      <!-- TABLE PREVIEW & ACTION CARD -->
+      <div class="bento-card col-large-input">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+          <div>
+            <div class="card-label">
+              <svg class="icon-svg" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              Preview Picking List Target
+            </div>
+            <h3 id="previewTitle" style="color: var(--text-dark); font-size: 18px;">RES-02/250526/MT-LAVISH</h3>
+          </div>
+          <button class="btn-primary" onclick="triggerPrint()">
+            <svg class="icon-svg" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Print List Picking
+          </button>
+        </div>
+
+        <div class="table-container">
+          <table class="preview-table">
+            <thead>
+              <tr>
+                <th>No</th>
+                <th>Deskripsi Produk</th>
+                <th style="text-align: center;">Qty (Beli)</th>
+                <th style="text-align: center;">Qty (Free)</th>
+                <th style="text-align: center;">Total</th>
+              </tr>
+            </thead>
+            <tbody id="previewTableBody">
+              <!-- Rendered Dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PRINTOUT CONTAINER (SESUAI TARGET IMAGE PICKING LIST) -->
+  <div id="print-picking-area">
+    <div class="picking-title" id="printDocTitle">RES-02/250526/MT-LAVISH</div>
+    <table class="print-table">
+      <thead>
+        <tr>
+          <th style="width: 5%;" class="text-center">No.</th>
+          <th style="width: 65%;">Deskripsi Produk</th>
+          <th style="width: 10%;" class="text-center">Qty (Beli)</th>
+          <th style="width: 10%;" class="text-center">Qty (Free)</th>
+          <th style="width: 10%;" class="text-center">total</th>
+        </tr>
+      </thead>
+      <tbody id="printTableBody">
+        <!-- Data Rendered Here -->
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+    // Sample Data Source (Mockup hasil pemrosesan parsing invoice AERIS)
+    const mockInvoiceData = [
+      { no: 1, desc: "Bubah 2.0 Merlot Complexion Set (6 pcs Face Brush)", qtyBeli: 3, qtyFree: 0 },
+      { no: 2, desc: "Bubah Individual (MERLOT) - BBH01 Powder", qtyBeli: 24, qtyFree: 2 },
+      { no: 3, desc: "Bubah Individual (MERLOT) - BBH03 Cheek", qtyBeli: 12, qtyFree: 1 },
+      { no: 4, desc: "Bubah Individual (MERLOT) - BBH04 Concealer", qtyBeli: 24, qtyFree: 2 },
+      { no: 5, desc: "Bubah Individual (MERLOT) - BBH05 Multitasker", qtyBeli: 12, qtyFree: 1 },
+      { no: 6, desc: "Bubah Individual (MERLOT) - BBH07 Nose Contour", qtyBeli: 12, qtyFree: 1 },
+      { no: 7, desc: "Bubah Individual (MERLOT) - BBH11 Hypersharp Eyeliner", qtyBeli: 12, qtyFree: 1 },
+      { no: 8, desc: "Bubah Individual (Merlot) - BBH12 Pointed Detail", qtyBeli: 12, qtyFree: 1 },
+      { no: 9, desc: "Blendie Bar Signature - Blooming Rose", qtyBeli: 5, qtyFree: 3 },
+      { no: 10, desc: "Blendie Bar Signature - Jasmine Rouge", qtyBeli: 10, qtyFree: 0 },
+      { no: 11, desc: "Blendie Bar Signature - Candy Pop", qtyBeli: 20, qtyFree: 0 },
+      { no: 12, desc: "Blendie Bar Signature - Fine Linen", qtyBeli: 15, qtyFree: 3 },
+      { no: 13, desc: "Blendie Bar Signature - Watermelon & Pear", qtyBeli: 10, qtyFree: 0 },
+      { no: 14, desc: "Coral Individual - CRL05 Foundation", qtyBeli: 12, qtyFree: 1 },
+      { no: 15, desc: "Triple Duty Powder Puff - Gray, Medium", qtyBeli: 36, qtyFree: 4 },
+      { no: 16, desc: "SNG-BALM/BLSH/BABY-GOLDEN/9G 8x", qtyBeli: 0, qtyFree: 8 },
+      { no: 17, desc: "SNG-BALM/BLSH/BABY-PINK/9G 8x", qtyBeli: 0, qtyFree: 8 },
+      { no: 18, desc: "SNG-BALM/BLSH/BABY-RUBY/9G 8x", qtyBeli: 0, qtyFree: 8 },
+      { no: 19, desc: "SNG-BALM/BLSH/BABY-SUNRISE/9G 8x", qtyBeli: 0, qtyFree: 8 },
+      { no: 20, desc: "SNG-BALM/BLSH/BABY-SUNSET/9G 9x", qtyBeli: 0, qtyFree: 9 },
+      { no: 21, desc: "SNG-BALM/BLSH/BABY-ROSE/9G 9x", qtyBeli: 0, qtyFree: 9 }
+    ];
+
+    // Function untuk memuat data ke UI Dashboard & Cetak
+    function loadPickingData(items) {
+      const previewTbody = document.getElementById('previewTableBody');
+      const printTbody = document.getElementById('printTableBody');
+      
+      previewTbody.innerHTML = '';
+      printTbody.innerHTML = '';
+
+      let grandTotalUnit = 0;
+
+      items.forEach((item) => {
+        const total = item.qtyBeli + item.qtyFree;
+        grandTotalUnit += total;
+
+        // Render Dashboard Table Row
+        const prevRow = `
+          <tr>
+            <td>${item.no}</td>
+            <td>${item.desc}</td>
+            <td style="text-align: center;">${item.qtyBeli || '-'}</td>
+            <td style="text-align: center;">${item.qtyFree || '-'}</td>
+            <td style="text-align: center; color: var(--aeris-primary);">${total}</td>
+          </tr>
+        `;
+        previewTbody.innerHTML += prevRow;
+
+        // Render Print Document Row
+        const printRow = `
+          <tr>
+            <td class="text-center">${item.no}</td>
+            <td>${item.desc}</td>
+            <td class="text-center">${item.qtyBeli > 0 ? item.qtyBeli : ''}</td>
+            <td class="text-center">${item.qtyFree > 0 ? item.qtyFree : ''}</td>
+            <td class="text-center">${total}</td>
+          </tr>
+        `;
+        printTbody.innerHTML += printRow;
+      });
+
+      // Update Dashboard Metrics
+      document.getElementById('metricTotalUnit').innerText = grandTotalUnit;
+      document.getElementById('metricSkuTypes').innerText = items.length;
+    }
+
+    // Trigger Print Command
+    function triggerPrint() {
+      const invoiceNo = document.getElementById('invoiceInput').value;
+      document.getElementById('printDocTitle').innerText = invoiceNo;
+      window.print();
+    }
+
+    // Dynamic Header Change Event
+    document.getElementById('invoiceInput').addEventListener('input', function(e) {
+      document.getElementById('previewTitle').innerText = e.target.value || "Invoice Reference";
+    });
+
+    // Initial Load
+    window.onload = function() {
+      loadPickingData(mockInvoiceData);
+    };
+  </script>
+</body>
+</html>
