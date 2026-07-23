@@ -86,7 +86,7 @@
   <div class="app-container">
     <header class="header-section">
       <h1 class="brand-title">AERIS FULFILLMENT</h1>
-      <p class="sub-title">Smart Multi-Line PDF Picking Generator</p>
+      <p class="sub-title">Precision PDF Invoice Picking Generator</p>
     </header>
 
     <div class="bento-grid">
@@ -94,7 +94,7 @@
         <div class="card-label">UPLOAD FILE PDF INVOICE</div>
         <div class="upload-zone">
           <p style="font-weight: 700; color: var(--text-dark); font-size:16px;">Klik atau Tarik File PDF Invoice ke Sini</p>
-          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Memproses PDF secara presisi</p>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Memproses PDF secara lokal</p>
           <input type="file" id="pdfFileInput" accept="application/pdf" onchange="processPDFLocally(event)">
         </div>
       </div>
@@ -111,7 +111,7 @@
 
       <div class="bento-card col-metric-4">
         <div class="card-label">SYSTEM STATUS</div>
-        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">LOCAL ENGINE READY</span></div>
+        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">ENGINE READY</span></div>
       </div>
 
       <div class="bento-card col-large">
@@ -205,18 +205,18 @@
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         
-        let allItems = [];
+        let allPageText = [];
 
         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
           const page = await pdf.getPage(pageNum);
           const textContent = await page.getTextContent();
           
-          // Simpan koordinat X, Y, dan Teks asli
+          // Ambil semua item teks lengkap dengan posisi koordinatnya
           textContent.items.forEach(item => {
             let str = item.str.trim();
             if (str.length > 0) {
-              allItems.push({
-                text: str,
+              allPageText.push({
+                str: str,
                 x: Math.round(item.transform[4]),
                 y: Math.round(item.transform[5]),
                 page: pageNum
@@ -225,138 +225,102 @@
           });
         }
 
-        parseAerisCoordinateBased(allItems);
+        parseAnchorGrid(allPageText);
         document.getElementById('uploadStatus').innerText = `Selesai: ${file.name}`;
 
       } catch (err) {
         console.error(err);
-        document.getElementById('uploadStatus').innerText = `Gagal membaca PDF.`;
+        document.getElementById('uploadStatus').innerText = `Gagal membaca file PDF.`;
       }
     }
 
-    function parseAerisCoordinateBased(items) {
-      // 1. Cari No Invoice
-      let fullText = items.map(i => i.text).join(" ");
+    function parseAnchorGrid(items) {
+      // 1. Ekstrak No Invoice
+      let fullText = items.map(i => i.str).join(" ");
       let invMatch = fullText.match(/RES-[0-9a-zA-Z\/\-\.\_\(\)]+/i);
       currentInvoiceNo = invMatch ? invMatch[0].trim() : "RES-INVOICE";
 
-      // 2. Grouping Teks Berdasarkan Koordinat Y (Baris)
-      let linesMap = {};
-      items.forEach(item => {
-        // Tentukan Y tolerance (1-2px selisih dianggap 1 baris)
-        let key = Object.keys(linesMap).find(y => Math.abs(y - item.y) <= 2);
-        if (!key) key = item.y;
-        
-        if (!linesMap[key]) linesMap[key] = [];
-        linesMap[key].push(item);
-      });
+      // 2. Filter Item yang berada di area Tabel
+      // Temukan batas Y Header "Description" dan batas Y Footer "Subtotal"
+      let descHeader = items.find(i => i.str.toLowerCase() === "description");
+      let subtotalFooter = items.find(i => i.str.toLowerCase().includes("subtotal") || i.str.toLowerCase().includes("total amount"));
 
-      // Urutkan baris dari paling atas ke paling bawah
-      let sortedY = Object.keys(linesMap).sort((a, b) => b - a);
+      let minY = subtotalFooter ? subtotalFooter.y : 0;
+      let maxY = descHeader ? descHeader.y : 9999;
 
-      let inTable = false;
-      let rawRows = [];
+      let tableItems = items.filter(i => i.y < maxY && i.y > minY);
 
-      sortedY.forEach(y => {
-        let lineItems = linesMap[y].sort((a, b) => a.x - b.x); // Urutkan dari Kiri ke Kanan
-        let lineStr = lineItems.map(i => i.text).join(" ").trim();
-        let l = lineStr.toLowerCase();
+      // 3. Kelompokkan berdasarkan Anchor "Rp" (Setiap baris produk AERIS pasti memiliki simbol Rp)
+      let rpAnchors = tableItems.filter(i => i.str === "Rp" || i.str.startsWith("Rp"));
 
-        // Mulai jika ketemu header Description
-        if (l.includes("description") && (l.includes("qty") || l.includes("retail"))) {
-          inTable = true;
-          return;
+      // Urutkan Anchor Rp dari atas ke bawah
+      rpAnchors.sort((a, b) => b.y - a.y);
+
+      let extractedProducts = [];
+
+      rpAnchors.forEach((anchor, index) => {
+        // Tentukan batas daerah vertikal milik item ini
+        let topY = anchor.y + 12; 
+        let bottomY = (index < rpAnchors.length - 1) ? rpAnchors[index + 1].y + 12 : minY;
+
+        // Ambil semua teks yang berada di dalam range vertikal item ini
+        let rowItems = tableItems.filter(i => i.y <= topY && i.y > bottomY);
+
+        // Pisahkan teks Deskripsi Produk (Teks yang berada di sebelah KIRI anchor Rp)
+        // Kolom Rp di invoice AERIS biasanya memiliki koordinat X > 250
+        let descParts = rowItems
+          .filter(i => i.x < anchor.x - 20)
+          .sort((a, b) => b.y === a.y ? a.x - b.x : b.y - a.y) // Urutkan Atas-Bawah, Kiri-Kanan
+          .map(i => i.str);
+
+        let rawDesc = descParts.join(" ")
+          .replace(/^\d+[\s\.\-]+/, '')          // Buang nomor urut di awal
+          .replace(/\b([1-9]\d*)\b/g, '')        // Buang angka acak
+          .replace(/---\s*/g, '')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        // Cari Qty & Diskon (Teks di antara nama produk dan Rp)
+        let middleItems = rowItems.filter(i => i.x < anchor.x && i.x > 150);
+        let middleText = middleItems.map(i => i.str).join(" ");
+
+        let isFree = middleText.includes("100%");
+
+        // Ekstrak Qty
+        let qty = 1;
+        let numbers = middleText.match(/\b([1-9]\d*)\b/g);
+        if (numbers) {
+          let validQtys = numbers.map(n => parseInt(n)).filter(n => n > 0 && n < 500);
+          if (validQtys.length > 0) qty = validQtys[0];
         }
 
-        // Stop jika ketemu Footer
-        if (l.includes("subtotal") || l.includes("total amount") || l.includes("ketentuan") || l.includes("diterima oleh")) {
-          inTable = false;
-          return;
-        }
+        // Rapikan jika ada karakter gantung
+        if (rawDesc.startsWith("-")) rawDesc = rawDesc.replace(/^-+\s*/, '');
+        if (rawDesc.endsWith("-")) rawDesc = rawDesc.replace(/\s*-+$/, '');
 
-        if (inTable) {
-          rawRows.push({
-            y: parseInt(y),
-            text: lineStr,
-            items: lineItems
-          });
-        }
-      });
-
-      // 3. MERGE MULTI-LINE BERDASARKAN JARAK Y
-      let mergedProducts = [];
-
-      rawRows.forEach(row => {
-        let l = row.text.toLowerCase();
-        if (l.includes("page") || l.startsWith("total")) return;
-
-        let hasRp = row.text.includes("Rp");
-        let hasPercent = row.text.includes("%");
-
-        // Jika baris ini punya "Rp" atau "%", berarti ini Baris Utama Produk
-        if (hasRp || hasPercent) {
-          // Ambil Qty & Diskon
-          let isFree = l.includes("100%");
-
-          // Ekstrak angka Qty
-          let qty = 1;
-          let qtyMatch = row.text.match(/\b([1-9]\d*)\b/g);
-          if (qtyMatch) {
-            // Ambil angka yang realistis sebagai Qty
-            let valid = qtyMatch.map(n => parseInt(n)).filter(n => n > 0 && n < 500);
-            if (valid.length > 0) qty = valid[0];
-          }
-
-          // Bersihkan Deskripsi Produk
-          let cleanDesc = row.text
-            .replace(/Rp\.?\s*[\d\.\,]+/gi, '')
-            .replace(/\d+%/g, '')
-            .replace(/^\d+[\s\.\-]+/, '')
-            .replace(/\b([1-9]\d*)\b/g, '')
-            .replace(/---\s*\d*/g, '')
-            .trim();
-
-          mergedProducts.push({
-            desc: cleanDesc,
+        if (rawDesc.length > 2) {
+          extractedProducts.push({
+            desc: rawDesc.trim(),
             qty: qty,
-            isFree: isFree,
-            y: row.y
+            isFree: isFree
           });
-        } 
-        else {
-          // Jika TIDAK punya Rp/%, ini BARIS SAMBUNGAN!
-          // Gabungkan ke produk sebelumnya jika jarak Y dekat (kurang dari 22px)
-          if (mergedProducts.length > 0) {
-            let lastProd = mergedProducts[mergedProducts.length - 1];
-            if (Math.abs(lastProd.y - row.y) < 22) {
-              let cleanSub = row.text.replace(/^\d+[\s\.\-]+/, '').replace(/\b[1-9]\d*\b/g, '').trim();
-              if (cleanSub.length > 0) {
-                lastProd.desc += " " + cleanSub;
-              }
-            }
-          }
         }
       });
 
-      // 4. GROUPING ITEM UNTUK DITAMPILKAN
-      let finalGroup = {};
-
-      mergedProducts.forEach(prod => {
-        let name = prod.desc.replace(/\s+/g, ' ').trim();
-        if (name.length > 2) {
-          if (!finalGroup[name]) {
-            finalGroup[name] = { desc: name, qtyBeli: 0, qtyFree: 0 };
-          }
-
-          if (prod.isFree) {
-            finalGroup[name].qtyFree += prod.qty;
-          } else {
-            finalGroup[name].qtyBeli += prod.qty;
-          }
+      // 4. Grouping & Totaling
+      let grouped = {};
+      extractedProducts.forEach(p => {
+        if (!grouped[p.desc]) {
+          grouped[p.desc] = { desc: p.desc, qtyBeli: 0, qtyFree: 0 };
+        }
+        if (p.isFree) {
+          grouped[p.desc].qtyFree += p.qty;
+        } else {
+          grouped[p.desc].qtyBeli += p.qty;
         }
       });
 
-      globalItems = Object.values(finalGroup);
+      globalItems = Object.values(grouped);
       renderDashboard();
     }
 
