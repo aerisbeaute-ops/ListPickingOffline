@@ -20,6 +20,8 @@
       --shadow-soft: 0 10px 25px rgba(0, 0, 0, 0.03);
       --badge-success-bg: #E6F4EA;
       --badge-success-text: #137333;
+      --badge-error-bg: #FCE8E6;
+      --badge-error-text: #C5221F;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Plus Jakarta Sans', sans-serif; }
@@ -45,6 +47,7 @@
       text-align: center;
       cursor: pointer;
       position: relative;
+      transition: all 0.2s ease;
     }
     .upload-zone:hover { border-color: var(--aeris-primary); background: #FFF5F5; }
     .upload-zone input[type="file"] { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
@@ -82,46 +85,44 @@
   <div class="app-container">
     <header class="header-section">
       <h1 class="brand-title">AERIS FULFILLMENT</h1>
-      <p class="sub-title">Automated GAS OCR PDF Extractor & Picking List Dashboard</p>
+      <p class="sub-title">Automated PDF Invoice Extractor & Picking List Generator</p>
     </header>
 
     <div class="bento-grid">
       
-      <!-- UPLOAD AREA -->
       <div class="bento-card col-large">
-        <div class="card-label">Upload File PDF Invoice</div>
+        <div class="card-label">UPLOAD FILE PDF INVOICE</div>
         <div class="upload-zone">
           <p style="font-weight: 700; color: var(--text-dark); font-size:16px;">Klik atau Tarik File PDF Invoice ke Sini</p>
-          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Memproses via GAS Cloud OCR Engine</p>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Memproses via Cloud OCR Engine</p>
           <input type="file" id="pdfFileInput" accept="application/pdf" onchange="uploadToGAS(event)">
         </div>
       </div>
 
       <div class="bento-card col-metric-4">
-        <div class="card-label">Total Unit Item</div>
+        <div class="card-label">TOTAL UNIT ITEM</div>
         <div class="metric-value" id="metricTotalUnit">0</div>
       </div>
 
       <div class="bento-card col-metric-4">
-        <div class="card-label">Variasi SKU</div>
+        <div class="card-label">VARIASI SKU</div>
         <div class="metric-value" id="metricSkuTypes">0</div>
       </div>
 
       <div class="bento-card col-metric-4">
-        <div class="card-label">System Status</div>
-        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">READY TO PROCESS</span></div>
+        <div class="card-label">SYSTEM STATUS</div>
+        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">SYSTEM READY</span></div>
       </div>
 
-      <!-- PREVIEW TABLE -->
       <div class="bento-card col-large">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
           <div>
-            <div class="card-label">No Invoice Reference</div>
+            <div class="card-label">NO INVOICE REFERENCE</div>
             <h3 id="invoiceNoHeader" style="color: var(--text-dark); font-size: 18px;">-</h3>
           </div>
           <div style="display: flex; gap: 10px;">
             <button class="btn-outline" onclick="openManualModal()">+ Tambah Item</button>
-            <button class="btn-primary" onclick="window.print()">Cetak List Picking</button>
+            <button class="btn-primary" onclick="window.print()">Print List Picking</button>
           </div>
         </div>
 
@@ -129,12 +130,12 @@
           <table class="preview-table">
             <thead>
               <tr>
-                <th>No</th>
-                <th>Deskripsi Produk</th>
-                <th style="text-align: center;">Qty (Beli)</th>
-                <th style="text-align: center;">Qty (Free)</th>
-                <th style="text-align: center;">Total</th>
-                <th style="text-align: center;">Aksi</th>
+                <th>NO</th>
+                <th>DESKRIPSI PRODUK</th>
+                <th style="text-align: center;">QTY (BELI)</th>
+                <th style="text-align: center;">QTY (FREE)</th>
+                <th style="text-align: center;">TOTAL</th>
+                <th style="text-align: center;">AKSI</th>
               </tr>
             </thead>
             <tbody id="previewTbody">
@@ -151,7 +152,6 @@
     </div>
   </div>
 
-  <!-- MODAL MANUAL ITEM -->
   <div class="modal-overlay" id="manualModal">
     <div class="modal-content">
       <h3 style="margin-bottom: 16px; color: var(--aeris-primary);">Tambah Item Manual</h3>
@@ -174,7 +174,6 @@
     </div>
   </div>
 
-  <!-- PRINTOUT CONTAINER -->
   <div id="print-picking-area">
     <div class="print-header" id="printInvoiceTitle">RES-INVOICE</div>
     <table class="print-table">
@@ -192,22 +191,17 @@
   </div>
 
   <script>
-    // MASUKKAN URL WEB APP GOOGLE APPS SCRIPT KAMU DI SINI
+    // URL WEB APP GAS RESMI
     const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxjMKosWwfSk66z3wlFyZdHxA_4uKYKBenWAi0a3YuIE-e7D1gsz26RcM0hsfKI4QTQYw/exec";
 
-    let currentInvoiceNo = "RES-INVOICE";
+    let currentInvoiceNo = "-";
     let globalItems = [];
 
     function uploadToGAS(event) {
       const file = event.target.files[0];
       if (!file) return;
 
-      if (GAS_WEB_APP_URL === "URL_WEB_APP_GAS_KAMU") {
-        alert("https://script.google.com/macros/s/AKfycbxjMKosWwfSk66z3wlFyZdHxA_4uKYKBenWAi0a3YuIE-e7D1gsz26RcM0hsfKI4QTQYw/exec");
-        return;
-      }
-
-      document.getElementById('uploadStatus').innerText = `Mengunggah ke Cloud OCR... Mohon tunggu sebentar.`;
+      document.getElementById('uploadStatus').innerText = `Sedang mengekstrak file ${file.name}... Mohon tunggu.`;
 
       const reader = new FileReader();
       reader.onload = function(e) {
@@ -226,19 +220,18 @@
         .then(res => res.json())
         .then(response => {
           if (response.status === "success") {
-            currentInvoiceNo = response.data.invoiceNo;
-            globalItems = response.data.items;
-            document.getElementById('uploadStatus').innerText = `Berhasil diekstrak via GAS OCR!`;
+            currentInvoiceNo = response.data.invoiceNo || "-";
+            globalItems = response.data.items || [];
+            document.getElementById('uploadStatus').innerText = `Berhasil memuat: ${file.name}`;
             renderDashboard();
           } else {
-            alert("Gagal membaca PDF: " + response.message);
-            document.getElementById('uploadStatus').innerText = `Gagal diproses.`;
+            document.getElementById('uploadStatus').innerText = `Gagal mengekstrak teks PDF.`;
+            renderError("Data tidak ditemukan. Pastikan file adalah Invoice resmi AERIS.");
           }
         })
         .catch(err => {
           console.error(err);
-          alert("Terjadi kesalahan koneksi ke Google Apps Script.");
-          document.getElementById('uploadStatus').innerText = `Gagal terhubung.`;
+          document.getElementById('uploadStatus').innerText = `Gagal terhubung ke Cloud Engine.`;
         });
       };
 
@@ -261,7 +254,7 @@
       let qtyBeli = parseInt(document.getElementById('manualQtyBeli').value) || 0;
       let qtyFree = parseInt(document.getElementById('manualQtyFree').value) || 0;
 
-      if (!name) { alert("Nama produk wajib diisi!"); return; }
+      if (!name) return;
 
       let existingIndex = globalItems.findIndex(i => i.desc.toLowerCase() === name.toLowerCase());
       if (existingIndex >= 0) {
@@ -280,6 +273,11 @@
       renderDashboard();
     }
 
+    function renderError(msg) {
+      const prevTbody = document.getElementById('previewTbody');
+      prevTbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red; font-weight:bold; padding:24px;">${msg}</td></tr>`;
+    }
+
     function renderDashboard() {
       document.getElementById('invoiceNoHeader').innerText = currentInvoiceNo;
       document.getElementById('printInvoiceTitle').innerText = currentInvoiceNo;
@@ -293,7 +291,7 @@
       let totalUnitSum = 0;
 
       if (globalItems.length === 0) {
-        prevTbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:24px;">Tabel kosong. Silakan upload PDF Invoice.</td></tr>`;
+        prevTbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:var(--text-muted); padding:24px;">Data tidak ditemukan. Pastikan file adalah Invoice resmi AERIS.</td></tr>`;
         document.getElementById('metricTotalUnit').innerText = '0';
         document.getElementById('metricSkuTypes').innerText = '0';
         return;
