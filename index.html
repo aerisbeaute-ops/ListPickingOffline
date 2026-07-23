@@ -86,7 +86,7 @@
   <div class="app-container">
     <header class="header-section">
       <h1 class="brand-title">AERIS FULFILLMENT</h1>
-      <p class="sub-title">Precision PDF Invoice Picking Generator</p>
+      <p class="sub-title">Precision Multi-Line PDF Picking Generator</p>
     </header>
 
     <div class="bento-grid">
@@ -111,7 +111,7 @@
 
       <div class="bento-card col-metric-4">
         <div class="card-label">SYSTEM STATUS</div>
-        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">ENGINE READY</span></div>
+        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">LOCAL PARSER READY</span></div>
       </div>
 
       <div class="bento-card col-large">
@@ -211,7 +211,6 @@
           const page = await pdf.getPage(pageNum);
           const textContent = await page.getTextContent();
           
-          // Ambil semua item teks lengkap dengan posisi koordinatnya
           textContent.items.forEach(item => {
             let str = item.str.trim();
             if (str.length > 0) {
@@ -225,23 +224,22 @@
           });
         }
 
-        parseAnchorGrid(allPageText);
+        parseAnchorGridStrict(allPageText);
         document.getElementById('uploadStatus').innerText = `Selesai: ${file.name}`;
 
       } catch (err) {
         console.error(err);
-        document.getElementById('uploadStatus').innerText = `Gagal membaca file PDF.`;
+        document.getElementById('uploadStatus').innerText = `Gagal membaca PDF.`;
       }
     }
 
-    function parseAnchorGrid(items) {
+    function parseAnchorGridStrict(items) {
       // 1. Ekstrak No Invoice
       let fullText = items.map(i => i.str).join(" ");
       let invMatch = fullText.match(/RES-[0-9a-zA-Z\/\-\.\_\(\)]+/i);
       currentInvoiceNo = invMatch ? invMatch[0].trim() : "RES-INVOICE";
 
-      // 2. Filter Item yang berada di area Tabel
-      // Temukan batas Y Header "Description" dan batas Y Footer "Subtotal"
+      // 2. Isolasi Area Tabel Utama
       let descHeader = items.find(i => i.str.toLowerCase() === "description");
       let subtotalFooter = items.find(i => i.str.toLowerCase().includes("subtotal") || i.str.toLowerCase().includes("total amount"));
 
@@ -250,53 +248,55 @@
 
       let tableItems = items.filter(i => i.y < maxY && i.y > minY);
 
-      // 3. Kelompokkan berdasarkan Anchor "Rp" (Setiap baris produk AERIS pasti memiliki simbol Rp)
+      // 3. Kunci Utama: Temukan Simbol "Rp" sebagai Batas Atas Baris Setiap Item
       let rpAnchors = tableItems.filter(i => i.str === "Rp" || i.str.startsWith("Rp"));
-
-      // Urutkan Anchor Rp dari atas ke bawah
-      rpAnchors.sort((a, b) => b.y - a.y);
+      rpAnchors.sort((a, b) => b.y - a.y); // Urutkan dari Atas ke Bawah
 
       let extractedProducts = [];
 
       rpAnchors.forEach((anchor, index) => {
-        // Tentukan batas daerah vertikal milik item ini
-        let topY = anchor.y + 12; 
-        let bottomY = (index < rpAnchors.length - 1) ? rpAnchors[index + 1].y + 12 : minY;
+        // Tentukan Range Y Baris Produk:
+        // Atas: Setinggi anchor.y + 4px
+        // Bawah: Sampai persis di atas anchor.y milik produk berikutnya
+        let topY = anchor.y + 4;
+        let bottomY = (index < rpAnchors.length - 1) ? rpAnchors[index + 1].y + 4 : minY;
 
-        // Ambil semua teks yang berada di dalam range vertikal item ini
-        let rowItems = tableItems.filter(i => i.y <= topY && i.y > bottomY);
+        // Ambil elemen teks khusus di area kiri (X < anchor.x - 10)
+        let descItems = tableItems.filter(i => i.y <= topY && i.y > bottomY && i.x < anchor.x - 10);
 
-        // Pisahkan teks Deskripsi Produk (Teks yang berada di sebelah KIRI anchor Rp)
-        // Kolom Rp di invoice AERIS biasanya memiliki koordinat X > 250
-        let descParts = rowItems
-          .filter(i => i.x < anchor.x - 20)
-          .sort((a, b) => b.y === a.y ? a.x - b.x : b.y - a.y) // Urutkan Atas-Bawah, Kiri-Kanan
-          .map(i => i.str);
+        // URUTKAN SANGAT PRESISI: Dari Atas ke Bawah, lalu dari Kiri ke Kanan
+        descItems.sort((a, b) => {
+          if (Math.abs(a.y - b.y) > 3) {
+            return b.y - a.y; // Atas dulu
+          }
+          return a.x - b.x;   // Baru Kiri ke Kanan
+        });
 
-        let rawDesc = descParts.join(" ")
-          .replace(/^\d+[\s\.\-]+/, '')          // Buang nomor urut di awal
-          .replace(/\b([1-9]\d*)\b/g, '')        // Buang angka acak
-          .replace(/---\s*/g, '')
-          .replace(/\s+/g, ' ')
+        let rawDesc = descItems.map(i => i.str).join(" ");
+
+        // Clean-up Deskripsi
+        rawDesc = rawDesc
+          .replace(/^\d+[\s\.\-]+/, '')            // Buang nomor tabel awal (1, 2, 3)
+          .replace(/---\s*/g, '')                  // Buang garis hubung separator
+          .replace(/\s+/g, ' ')                    // Rapikan spasi
           .trim();
 
-        // Cari Qty & Diskon (Teks di antara nama produk dan Rp)
-        let middleItems = rowItems.filter(i => i.x < anchor.x && i.x > 150);
+        // Rapikan jika strip gantung di depan/belakang
+        if (rawDesc.startsWith("-")) rawDesc = rawDesc.replace(/^-+\s*/, '');
+        if (rawDesc.endsWith("-")) rawDesc = rawDesc.replace(/\s*-+$/, '');
+
+        // Ambil Qty & Diskon (Teks di antara nama produk dan Rp)
+        let middleItems = tableItems.filter(i => i.y <= topY && i.y > bottomY && i.x < anchor.x && i.x > 140);
         let middleText = middleItems.map(i => i.str).join(" ");
 
         let isFree = middleText.includes("100%");
-
-        // Ekstrak Qty
         let qty = 1;
+
         let numbers = middleText.match(/\b([1-9]\d*)\b/g);
         if (numbers) {
           let validQtys = numbers.map(n => parseInt(n)).filter(n => n > 0 && n < 500);
           if (validQtys.length > 0) qty = validQtys[0];
         }
-
-        // Rapikan jika ada karakter gantung
-        if (rawDesc.startsWith("-")) rawDesc = rawDesc.replace(/^-+\s*/, '');
-        if (rawDesc.endsWith("-")) rawDesc = rawDesc.replace(/\s*-+$/, '');
 
         if (rawDesc.length > 2) {
           extractedProducts.push({
@@ -307,7 +307,7 @@
         }
       });
 
-      // 4. Grouping & Totaling
+      // 4. Grouping & Totaling (Menyatukan item identik jika ada)
       let grouped = {};
       extractedProducts.forEach(p => {
         if (!grouped[p.desc]) {
