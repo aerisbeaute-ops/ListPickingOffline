@@ -10,9 +10,6 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <!-- PDF.js Library untuk Parse File PDF di Browser -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-
   <style>
     :root {
       --aeris-primary: #701403;
@@ -122,7 +119,7 @@
       border: 2px dashed #CBD5E1;
       background: #F8FAFC;
       border-radius: 20px;
-      padding: 24px;
+      padding: 28px;
       text-align: center;
       cursor: pointer;
       transition: all 0.2s ease;
@@ -142,7 +139,7 @@
     }
 
     .upload-icon {
-      width: 32px; height: 32px;
+      width: 36px; height: 36px;
       stroke: var(--aeris-primary);
       margin-bottom: 8px;
     }
@@ -202,7 +199,7 @@
       border-bottom: 1px solid #F8FAFC;
     }
 
-    /* CSS PRINT DRIVER OVERRIDE */
+    /* CSS PRINTOUT GUDANG (TABEL BERSISIAN PRESI) */
     #print-picking-area {
       display: none;
     }
@@ -230,7 +227,7 @@
         border: 1.5px solid #000;
         text-align: center;
         font-weight: bold;
-        font-size: 14pt;
+        font-size: 13pt;
         padding: 6px;
         margin-bottom: -1.5px;
       }
@@ -278,7 +275,7 @@
         <div class="upload-zone">
           <svg class="upload-icon" viewBox="0 0 24 24" fill="none"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 0115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <p style="font-weight: 700; color: var(--text-dark);">Klik atau Tarik File PDF Invoice ke Sini</p>
-          <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Format file support: PDF Asli Invoice AERIS</p>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Format disarankan: PDF Asli Invoice AERIS</p>
           <input type="file" id="pdfFileInput" accept="application/pdf" onchange="handlePdfUpload(event)">
         </div>
       </div>
@@ -303,10 +300,10 @@
       <div class="bento-card col-metric-4">
         <div class="card-label">
           <svg class="icon-svg" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-          System Readiness
+          System Status
         </div>
         <div style="margin-top: 8px;">
-          <span class="status-badge" id="sysStatus">WAITING FOR PDF</span>
+          <span class="status-badge" id="sysStatus">SYSTEM READY</span>
         </div>
       </div>
 
@@ -340,7 +337,7 @@
             <tbody id="previewTbody">
               <tr>
                 <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 32px;">
-                  Silakan upload file PDF Invoice terlebih dahulu untuk memproses data.
+                  Silakan upload file PDF Invoice untuk memproses data otomatis.
                 </td>
               </tr>
             </tbody>
@@ -351,7 +348,7 @@
     </div>
   </div>
 
-  <!-- CONTAINER CETAK / PRINTOUT -->
+  <!-- PRINTOUT CONTAINER -->
   <div id="print-picking-area">
     <div class="print-header" id="printInvoiceTitle">RES-01/210726/TD-INTIMAKEUP (PKU)</div>
     <table class="print-table">
@@ -369,17 +366,18 @@
     </table>
   </div>
 
+  <!-- SCRIPT DILETAK KAN DI BAWAH AGAR TIDAK MEMBLOKIR RENDER HTML -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script>
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    }
 
     async function handlePdfUpload(event) {
       const file = event.target.files[0];
-      if (!file || file.type !== 'application/pdf') {
-        alert('Mohon upload file PDF Invoice yang valid!');
-        return;
-      }
+      if (!file) return;
 
-      document.getElementById('uploadStatus').innerText = `Memproses file: ${file.name}...`;
+      document.getElementById('uploadStatus').innerText = `Memproses: ${file.name}...`;
 
       try {
         const arrayBuffer = await file.arrayBuffer();
@@ -406,24 +404,25 @@
 
       } catch (err) {
         console.error(err);
-        alert('Gagal membaca PDF. Pastikan file PDF Invoice tidak dikunci.');
-        document.getElementById('uploadStatus').innerText = 'Gagal memproses file.';
+        alert('Terjadi kesalahan saat memproses PDF. Mencoba format standar...');
       }
     }
 
     function parseAerisPdfInvoice(textItems, rawText) {
+      // 1. Ekstrak Nomor Invoice Lengkap
       let invoiceNo = "RES-INVOICE";
-      let invoiceMatch = rawText.match(/RES-[\w\d\/-]+(?:\([^)]+\)|[^\s\n]+)*/i);
+      let invoiceMatch = rawText.match(/RES-[\w\d\/-]+(?:\s*\([^)]+\)|[^\s\n]+)*/i);
       if (invoiceMatch) {
         invoiceNo = invoiceMatch[0].trim();
       }
 
+      // 2. Kelompokkan berdasarkan Baris Y
       let rowGroups = {};
       textItems.forEach(item => {
         let str = item.str.trim();
         if (!str) return;
 
-        let yKey = Object.keys(rowGroups).find(y => Math.abs(parseFloat(y) - item.y) < 3.5);
+        let yKey = Object.keys(rowGroups).find(y => Math.abs(parseFloat(y) - item.y) < 4.0);
         if (!yKey) {
           yKey = item.y.toString();
           rowGroups[yKey] = [];
@@ -451,26 +450,19 @@
 
         if (line.includes("%")) {
           let isFree = line.includes("100%");
-          let matchQty = line.match(/^\d+\s+([\s\S]+?)\s+(\d+)\s+Rp/);
-          
-          let desc = "";
-          let qty = 0;
+          let qty = 1;
 
+          let matchQty = line.match(/\b(\d+)\s+Rp/);
           if (matchQty) {
-            desc = matchQty[1].trim();
-            qty = parseInt(matchQty[2]) || 0;
-          } else {
-            let parts = line.split(/\s+/);
-            if (!isNaN(parts[0])) parts.shift();
-            
-            let rpIndex = parts.findIndex(p => p.includes("Rp"));
-            if (rpIndex > 1) {
-              qty = parseInt(parts[rpIndex - 1]) || 1;
-              desc = parts.slice(0, rpIndex - 1).join(" ");
-            }
+            qty = parseInt(matchQty[1]) || 1;
           }
 
-          desc = desc.replace(/-?\s*Rp.*/i, '').replace(/\b\d+\s*$/, '').trim();
+          let desc = line
+            .replace(/^\d+\s+/, '')
+            .replace(/\s+\d+\s+Rp.*/, '')
+            .replace(/\s+\d+%\s+.*/, '')
+            .replace(/-?\s*Rp.*/i, '')
+            .trim();
 
           if (i > 0 && !rawRows[i-1].includes("%") && !rawRows[i-1].includes("INVOICE") && !rawRows[i-1].includes("No")) {
             let prevText = rawRows[i-1].trim();
@@ -479,7 +471,7 @@
             }
           }
 
-          if (desc && qty > 0) {
+          if (desc && desc.length > 2) {
             if (!groupedProducts[desc]) {
               groupedProducts[desc] = { desc: desc, qtyBeli: 0, qtyFree: 0 };
             }
@@ -511,8 +503,7 @@
     function updateDashboardUI(invoiceNo, items) {
       document.getElementById('invoiceNoHeader').innerText = invoiceNo;
       document.getElementById('printInvoiceTitle').innerText = invoiceNo;
-      document.getElementById('uploadStatus').innerText = `Berhasil memuat invoice: ${invoiceNo}`;
-      document.getElementById('sysStatus').innerText = `READY TO PRINT`;
+      document.getElementById('uploadStatus').innerText = `Berhasil memuat: ${invoiceNo}`;
 
       const prevTbody = document.getElementById('previewTbody');
       const printTbody = document.getElementById('printTbody');
