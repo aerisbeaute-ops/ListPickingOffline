@@ -86,16 +86,15 @@
   <div class="app-container">
     <header class="header-section">
       <h1 class="brand-title">AERIS FULFILLMENT</h1>
-      <p class="sub-title">Automated PDF Invoice Table Extractor & Picking List Generator</p>
+      <p class="sub-title">Smart Multi-Line PDF Picking Generator</p>
     </header>
 
     <div class="bento-grid">
-      
       <div class="bento-card col-large">
         <div class="card-label">UPLOAD FILE PDF INVOICE</div>
         <div class="upload-zone">
           <p style="font-weight: 700; color: var(--text-dark); font-size:16px;">Klik atau Tarik File PDF Invoice ke Sini</p>
-          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Memproses tabel PDF secara langsung di browser</p>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Memproses PDF secara presisi</p>
           <input type="file" id="pdfFileInput" accept="application/pdf" onchange="processPDFLocally(event)">
         </div>
       </div>
@@ -112,7 +111,7 @@
 
       <div class="bento-card col-metric-4">
         <div class="card-label">SYSTEM STATUS</div>
-        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">LOCAL PARSER READY</span></div>
+        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">LOCAL ENGINE READY</span></div>
       </div>
 
       <div class="bento-card col-large">
@@ -142,14 +141,13 @@
             <tbody id="previewTbody">
               <tr>
                 <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 32px;">
-                  Silakan upload PDF Invoice atau tambah item manual.
+                  Silakan upload PDF Invoice.
                 </td>
               </tr>
             </tbody>
           </table>
         </div>
       </div>
-
     </div>
   </div>
 
@@ -201,158 +199,164 @@
       const file = event.target.files[0];
       if (!file) return;
 
-      document.getElementById('uploadStatus').innerText = `Membaca file ${file.name}...`;
+      document.getElementById('uploadStatus').innerText = `Membaca ${file.name}...`;
 
       try {
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         
-        let allLines = [];
+        let allItems = [];
 
         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
           const page = await pdf.getPage(pageNum);
           const textContent = await page.getTextContent();
           
-          let linesByY = {};
+          // Simpan koordinat X, Y, dan Teks asli
           textContent.items.forEach(item => {
-            let y = Math.round(item.transform[5]);
-            if (!linesByY[y]) linesByY[y] = [];
-            linesByY[y].push(item.str);
-          });
-
-          let sortedY = Object.keys(linesByY).sort((a, b) => b - a);
-          sortedY.forEach(y => {
-            let lineText = linesByY[y].join(" ").trim();
-            if (lineText.length > 0) {
-              allLines.push(lineText);
+            let str = item.str.trim();
+            if (str.length > 0) {
+              allItems.push({
+                text: str,
+                x: Math.round(item.transform[4]),
+                y: Math.round(item.transform[5]),
+                page: pageNum
+              });
             }
           });
         }
 
-        parseAerisTableStrict(allLines);
-        document.getElementById('uploadStatus').innerText = `Selesai mengekstrak: ${file.name}`;
+        parseAerisCoordinateBased(allItems);
+        document.getElementById('uploadStatus').innerText = `Selesai: ${file.name}`;
 
       } catch (err) {
         console.error(err);
-        document.getElementById('uploadStatus').innerText = `Gagal membaca file PDF.`;
-        renderError("Gagal memproses file PDF.");
+        document.getElementById('uploadStatus').innerText = `Gagal membaca PDF.`;
       }
     }
 
-    function parseAerisTableStrict(lines) {
-      let fullText = lines.join("\n");
-
-      // 1. Ekstrak No Invoice Resmi
+    function parseAerisCoordinateBased(items) {
+      // 1. Cari No Invoice
+      let fullText = items.map(i => i.text).join(" ");
       let invMatch = fullText.match(/RES-[0-9a-zA-Z\/\-\.\_\(\)]+/i);
       currentInvoiceNo = invMatch ? invMatch[0].trim() : "RES-INVOICE";
 
-      // 2. ISOLASI HANYA AREA TABEL PRODUK (Skip header alamat & footer)
-      let inTableZone = false;
-      let rawTableLines = [];
+      // 2. Grouping Teks Berdasarkan Koordinat Y (Baris)
+      let linesMap = {};
+      items.forEach(item => {
+        // Tentukan Y tolerance (1-2px selisih dianggap 1 baris)
+        let key = Object.keys(linesMap).find(y => Math.abs(y - item.y) <= 2);
+        if (!key) key = item.y;
+        
+        if (!linesMap[key]) linesMap[key] = [];
+        linesMap[key].push(item);
+      });
 
-      for (let i = 0; i < lines.length; i++) {
-        let line = lines[i].trim();
-        let l = line.toLowerCase();
+      // Urutkan baris dari paling atas ke paling bawah
+      let sortedY = Object.keys(linesMap).sort((a, b) => b - a);
 
+      let inTable = false;
+      let rawRows = [];
+
+      sortedY.forEach(y => {
+        let lineItems = linesMap[y].sort((a, b) => a.x - b.x); // Urutkan dari Kiri ke Kanan
+        let lineStr = lineItems.map(i => i.text).join(" ").trim();
+        let l = lineStr.toLowerCase();
+
+        // Mulai jika ketemu header Description
         if (l.includes("description") && (l.includes("qty") || l.includes("retail"))) {
-          inTableZone = true;
-          continue;
+          inTable = true;
+          return;
         }
 
+        // Stop jika ketemu Footer
         if (l.includes("subtotal") || l.includes("total amount") || l.includes("ketentuan") || l.includes("diterima oleh")) {
-          inTableZone = false;
-          break;
+          inTable = false;
+          return;
         }
 
-        if (inTableZone) {
-          rawTableLines.push(line);
+        if (inTable) {
+          rawRows.push({
+            y: parseInt(y),
+            text: lineStr,
+            items: lineItems
+          });
         }
-      }
+      });
 
-      // 3. LOGIKA PRESERVASI MULTI-LINE & EKSTRAKSI QTY
-      let parsedProducts = [];
-      let currentProduct = null;
+      // 3. MERGE MULTI-LINE BERDASARKAN JARAK Y
+      let mergedProducts = [];
 
-      for (let i = 0; i < rawTableLines.length; i++) {
-        let line = rawTableLines[i].trim();
-        let l = line.toLowerCase();
+      rawRows.forEach(row => {
+        let l = row.text.toLowerCase();
+        if (l.includes("page") || l.startsWith("total")) return;
 
-        if (l.includes("page") || l.startsWith("total")) continue;
+        let hasRp = row.text.includes("Rp");
+        let hasPercent = row.text.includes("%");
 
-        // Jika baris mengandung harga 'Rp' (Artinya baris utama transaksi)
-        if (line.includes("Rp")) {
-          // Ambil % Diskon (100% = Free)
-          let discMatch = line.match(/(\d+)%/);
-          let discVal = discMatch ? parseInt(discMatch[1]) : 0;
-          let isFree = (discVal === 100);
+        // Jika baris ini punya "Rp" atau "%", berarti ini Baris Utama Produk
+        if (hasRp || hasPercent) {
+          // Ambil Qty & Diskon
+          let isFree = l.includes("100%");
 
-          // Ambil Qty: Cari angka SEBELUM 'Rp'
-          let beforeRp = line.split("Rp")[0];
-          let qtyMatches = beforeRp.match(/\b([1-9]\d*)\b/g);
+          // Ekstrak angka Qty
           let qty = 1;
-
-          if (qtyMatches && qtyMatches.length > 0) {
-            // Ambil angka terakhir sebelum Rp (karena angka paling awal biasa nomor urut tabel)
-            let candidateQty = parseInt(qtyMatches[qtyMatches.length - 1]);
-            if (candidateQty > 0 && candidateQty < 500) {
-              qty = candidateQty;
-            }
+          let qtyMatch = row.text.match(/\b([1-9]\d*)\b/g);
+          if (qtyMatch) {
+            // Ambil angka yang realistis sebagai Qty
+            let valid = qtyMatch.map(n => parseInt(n)).filter(n => n > 0 && n < 500);
+            if (valid.length > 0) qty = valid[0];
           }
 
-          // Bersihkan teks nama produk dari nomor urut & angka gantung
-          let cleanTitle = beforeRp
+          // Bersihkan Deskripsi Produk
+          let cleanDesc = row.text
+            .replace(/Rp\.?\s*[\d\.\,]+/gi, '')
+            .replace(/\d+%/g, '')
             .replace(/^\d+[\s\.\-]+/, '')
-            .replace(/\b[1-9]\d*\b/g, '')
+            .replace(/\b([1-9]\d*)\b/g, '')
             .replace(/---\s*\d*/g, '')
             .trim();
 
-          if (currentProduct) {
-            parsedProducts.push(currentProduct);
-          }
-
-          currentProduct = {
-            desc: cleanTitle,
+          mergedProducts.push({
+            desc: cleanDesc,
             qty: qty,
-            isFree: isFree
-          };
+            isFree: isFree,
+            y: row.y
+          });
         } 
         else {
-          // Jika baris TIDAK ada 'Rp', ini adalah SAMBUNGAN NAMA PRODUK dari baris atasnya (seperti "Powder", "Soda")
-          let cleanSubTitle = line
-            .replace(/^\d+[\s\.\-]+/, '')
-            .replace(/\b[1-9]\d*\b/g, '')
-            .trim();
-
-          if (currentProduct && cleanSubTitle.length > 0) {
-            currentProduct.desc += " " + cleanSubTitle;
-          }
-        }
-      }
-
-      if (currentProduct) {
-        parsedProducts.push(currentProduct);
-      }
-
-      // 4. GROUPING PRODUK SEJENIS & PENJUMLAHAN QTY
-      let groupedProducts = {};
-
-      parsedProducts.forEach(prod => {
-        let finalDesc = prod.desc.replace(/\s+/g, ' ').trim();
-
-        if (finalDesc.length > 2) {
-          if (!groupedProducts[finalDesc]) {
-            groupedProducts[finalDesc] = { desc: finalDesc, qtyBeli: 0, qtyFree: 0 };
-          }
-
-          if (prod.isFree) {
-            groupedProducts[finalDesc].qtyFree += prod.qty;
-          } else {
-            groupedProducts[finalDesc].qtyBeli += prod.qty;
+          // Jika TIDAK punya Rp/%, ini BARIS SAMBUNGAN!
+          // Gabungkan ke produk sebelumnya jika jarak Y dekat (kurang dari 22px)
+          if (mergedProducts.length > 0) {
+            let lastProd = mergedProducts[mergedProducts.length - 1];
+            if (Math.abs(lastProd.y - row.y) < 22) {
+              let cleanSub = row.text.replace(/^\d+[\s\.\-]+/, '').replace(/\b[1-9]\d*\b/g, '').trim();
+              if (cleanSub.length > 0) {
+                lastProd.desc += " " + cleanSub;
+              }
+            }
           }
         }
       });
 
-      globalItems = Object.values(groupedProducts);
+      // 4. GROUPING ITEM UNTUK DITAMPILKAN
+      let finalGroup = {};
+
+      mergedProducts.forEach(prod => {
+        let name = prod.desc.replace(/\s+/g, ' ').trim();
+        if (name.length > 2) {
+          if (!finalGroup[name]) {
+            finalGroup[name] = { desc: name, qtyBeli: 0, qtyFree: 0 };
+          }
+
+          if (prod.isFree) {
+            finalGroup[name].qtyFree += prod.qty;
+          } else {
+            finalGroup[name].qtyBeli += prod.qty;
+          }
+        }
+      });
+
+      globalItems = Object.values(finalGroup);
       renderDashboard();
     }
 
@@ -389,11 +393,6 @@
     function deleteItem(index) {
       globalItems.splice(index, 1);
       renderDashboard();
-    }
-
-    function renderError(msg) {
-      const prevTbody = document.getElementById('previewTbody');
-      prevTbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:red; font-weight:bold; padding:24px;">${msg}</td></tr>`;
     }
 
     function renderDashboard() {
