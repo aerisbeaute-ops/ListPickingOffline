@@ -41,7 +41,7 @@
       border: 2px dashed #CBD5E1;
       background: #F8FAFC;
       border-radius: 20px;
-      padding: 32px;
+      padding: 28px;
       text-align: center;
       cursor: pointer;
       position: relative;
@@ -50,13 +50,24 @@
     .upload-zone input[type="file"] { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 
     .status-badge { display: inline-block; padding: 6px 16px; border-radius: 50px; background-color: var(--badge-success-bg); color: var(--badge-success-text); font-size: 12px; font-weight: 700; }
-    .btn-primary { background: var(--aeris-primary); color: #FFFFFF; border: none; padding: 14px 28px; border-radius: 50px; font-weight: 700; font-size: 14px; cursor: pointer; }
+    .btn-primary { background: var(--aeris-primary); color: #FFFFFF; border: none; padding: 12px 24px; border-radius: 50px; font-weight: 700; font-size: 14px; cursor: pointer; transition: 0.2s; }
+    .btn-primary:hover { background: var(--aeris-hover); }
+    .btn-outline { background: transparent; color: var(--aeris-primary); border: 2px solid var(--aeris-primary); padding: 12px 24px; border-radius: 50px; font-weight: 700; font-size: 14px; cursor: pointer; transition: 0.2s; }
+    .btn-outline:hover { background: #FFF5F5; }
+
+    .action-buttons { display: flex; gap: 12px; }
 
     .preview-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
     .preview-table th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); padding: 12px 16px; border-bottom: 2px solid #F1F5F9; text-align: left; }
     .preview-table td { padding: 14px 16px; font-size: 14px; font-weight: 600; border-bottom: 1px solid #F8FAFC; }
 
-    /* LAYOUT PRINT GUDANG BERSISIAN PRESI */
+    /* Modal Tambah Baris Manual */
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
+    .modal-content { background: #FFF; padding: 24px; border-radius: 20px; width: 400px; max-width: 90%; box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 12px; font-weight: 700; margin-bottom: 6px; color: var(--text-dark); }
+    .form-group input { width: 100%; padding: 10px; border: 1px solid #CBD5E1; border-radius: 8px; font-family: inherit; }
+
     #print-picking-area { display: none; }
 
     @media print {
@@ -81,11 +92,12 @@
 
     <div class="bento-grid">
       
+      <!-- 1. FUNGSI UPLOAD PDF -->
       <div class="bento-card col-large">
         <div class="card-label">Upload File PDF Invoice</div>
         <div class="upload-zone">
           <p style="font-weight: 700; color: var(--text-dark); font-size:16px;">Klik atau Tarik File PDF Invoice ke Sini</p>
-          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Format disarankan: PDF Asli Invoice AERIS</p>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Format file: PDF Invoice Asli AERIS</p>
           <input type="file" id="pdfFileInput" accept="application/pdf" onchange="handlePdfUpload(event)">
         </div>
       </div>
@@ -105,15 +117,17 @@
         <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">SYSTEM READY</span></div>
       </div>
 
+      <!-- 2. HASIL BACA PDF & 4. TAMBAH MANUAL & 5. PRINT LIST -->
       <div class="bento-card col-large">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
           <div>
             <div class="card-label">No Invoice Reference</div>
             <h3 id="invoiceNoHeader" style="color: var(--text-dark); font-size: 18px;">-</h3>
           </div>
-          <button class="btn-primary" onclick="window.print()">
-            Print List Picking
-          </button>
+          <div class="action-buttons">
+            <button class="btn-outline" onclick="openManualModal()">+ Tambah Baris Manual</button>
+            <button class="btn-primary" onclick="window.print()">Cetak List Picking</button>
+          </div>
         </div>
 
         <div style="overflow-x: auto;">
@@ -130,7 +144,7 @@
             <tbody id="previewTbody">
               <tr>
                 <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 32px;">
-                  Silakan upload file PDF Invoice untuk memproses data.
+                  Tabel kosong. Silakan upload PDF atau tambah baris manual.
                 </td>
               </tr>
             </tbody>
@@ -141,6 +155,30 @@
     </div>
   </div>
 
+  <!-- MODAL TAMBAH BARIS MANUAL (SYARAT KE-4) -->
+  <div class="modal-overlay" id="manualModal">
+    <div class="modal-content">
+      <h3 style="margin-bottom: 16px; color: var(--aeris-primary);">Tambah Item Manual</h3>
+      <div class="form-group">
+        <label>Nama Produk</label>
+        <input type="text" id="manualName" placeholder="Contoh: Bubah 2.0 Merlot Complete Set">
+      </div>
+      <div class="form-group">
+        <label>Qty (Beli) - Normal</label>
+        <input type="number" id="manualQtyBeli" value="0" min="0">
+      </div>
+      <div class="form-group">
+        <label>Qty (Free) - Diskon 100%</label>
+        <input type="number" id="manualQtyFree" value="0" min="0">
+      </div>
+      <div style="display: flex; gap: 10px; margin-top: 24px;">
+        <button class="btn-primary" style="flex: 1;" onclick="addManualItem()">Simpan Item</button>
+        <button class="btn-outline" style="flex: 1;" onclick="closeManualModal()">Batal</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LAYOUT CETAK (SYARAT KE-5) -->
   <div id="print-picking-area">
     <div class="print-header" id="printInvoiceTitle">RES-INVOICE</div>
     <table class="print-table">
@@ -163,6 +201,11 @@
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
     }
 
+    // STATE MANAGEMENT UNTUK DATA DASHBOARD
+    let currentInvoiceNo = "INVOICE MANUAL";
+    let globalItems = []; // Simpan semua item (dari PDF + Manual)
+
+    // SYARAT 2, 3, & 6: BACA PDF & BEDAKAN HARGA, NAMA, QTY (Y-Coordinate Scanner)
     async function handlePdfUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -173,87 +216,149 @@
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         
-        let fullText = "";
+        let allTextItems = [];
+        let rawTextString = "";
 
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
           const textContent = await page.getTextContent();
-          const pageText = textContent.items.map(item => item.str).join(" ");
-          fullText += pageText + " ";
+          
+          textContent.items.forEach(item => {
+            if (item.str.trim() !== '') {
+              allTextItems.push({
+                text: item.str.trim(),
+                x: item.transform[4],
+                y: item.transform[5] // Posisi vertikal di PDF
+              });
+              rawTextString += item.str + " ";
+            }
+          });
         }
 
-        // Normalisasi teks
-        fullText = fullText
-          .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212\uFF0D]/g, '-')
-          .replace(/\s+/g, ' ');
+        // Cari No Invoice
+        let invMatch = rawTextString.match(/RES-[0-9a-zA-Z\/\-\s\(\)]+/i);
+        if (invMatch) {
+          currentInvoiceNo = invMatch[0].split(" Date")[0].split(" Tanggal")[0].split(" INVOICE")[0].trim();
+        }
 
-        parseAerisPdfInvoiceGlobal(fullText);
+        // Kelompokkan teks berdasarkan baris (Y)
+        let lines = {};
+        allTextItems.forEach(item => {
+          // Toleransi beda tinggi 4 pixel dianggap 1 baris
+          let yKey = Object.keys(lines).find(y => Math.abs(parseFloat(y) - item.y) < 4.0);
+          if (!yKey) {
+            yKey = item.y.toString();
+            lines[yKey] = [];
+          }
+          lines[yKey].push(item);
+        });
+
+        // Urutkan dari baris atas ke bawah
+        let sortedY = Object.keys(lines).sort((a, b) => parseFloat(b) - parseFloat(a));
+        
+        let extractedProducts = {};
+
+        sortedY.forEach(y => {
+          // Urutkan teks dari kiri ke kanan (X)
+          let rowItems = lines[y].sort((a, b) => a.x - b.x);
+          let rowText = rowItems.map(i => i.text).join(" ");
+
+          // LOGIKA CERDAS: Baris produk biasanya punya Harga (Rp) dan Qty
+          // Contoh: "Bubah 2.0 Merlot 36 Rp 450.000 100%"
+          if (rowText.includes("Rp") && (rowText.includes("%") || rowText.match(/\d/))) {
+            let isFree = rowText.includes("100%"); // Deteksi Qty Free
+            
+            // Ambil Qty: Angka tepat sebelum 'Rp'
+            let qty = 1;
+            let qtyMatch = rowText.match(/\b(\d+)\s+Rp/);
+            if (qtyMatch) qty = parseInt(qtyMatch[1]) || 1;
+
+            // Ambil Nama: Potong teks sebelum Qty dan Rp, buang nomor urut di awal
+            let productName = rowText
+              .replace(/^\d+\s+/, '') // Buang nomor urut "1 ", "2 "
+              .replace(/\s+\d+\s+Rp.*/, '') // Buang Qty dan ke belakangnya
+              .replace(/^(PCS|UNIT|BOX)\s+/i, '')
+              .trim();
+
+            if (productName.length > 3 && !productName.includes("Subtotal") && !productName.includes("Ketentuan")) {
+              if (!extractedProducts[productName]) {
+                extractedProducts[productName] = { desc: productName, qtyBeli: 0, qtyFree: 0 };
+              }
+              if (isFree) {
+                extractedProducts[productName].qtyFree += qty;
+              } else {
+                extractedProducts[productName].qtyBeli += qty;
+              }
+            }
+          }
+        });
+
+        // Timpa data lama dengan data baru dari PDF
+        globalItems = [];
+        for (let key in extractedProducts) {
+          globalItems.push({
+            desc: key,
+            qtyBeli: extractedProducts[key].qtyBeli,
+            qtyFree: extractedProducts[key].qtyFree
+          });
+        }
+
+        renderDashboard();
+        document.getElementById('uploadStatus').innerText = `Berhasil diekstrak!`;
 
       } catch (err) {
         console.error(err);
-        alert('Gagal membaca PDF.');
+        alert('Gagal mengekstrak PDF. Pastikan file tidak di-password.');
       }
     }
 
-    function parseAerisPdfInvoiceGlobal(text) {
-      // 1. Ekstrak No Invoice
-      let invoiceNo = "RES-INVOICE";
-      let invMatch = text.match(/RES-[0-9a-zA-Z\/\-\s\(\)]+/i);
-      if (invMatch) {
-        invoiceNo = invMatch[0].split(" Date")[0].split(" Tanggal")[0].split(" INVOICE")[0].trim();
+    // SYARAT 4: FUNGSI TAMBAH BARIS MANUAL
+    function openManualModal() {
+      document.getElementById('manualModal').style.display = 'flex';
+      document.getElementById('manualName').value = '';
+      document.getElementById('manualQtyBeli').value = '0';
+      document.getElementById('manualQtyFree').value = '0';
+    }
+
+    function closeManualModal() {
+      document.getElementById('manualModal').style.display = 'none';
+    }
+
+    function addManualItem() {
+      let name = document.getElementById('manualName').value.trim();
+      let qtyBeli = parseInt(document.getElementById('manualQtyBeli').value) || 0;
+      let qtyFree = parseInt(document.getElementById('manualQtyFree').value) || 0;
+
+      if (!name) {
+        alert("Nama produk tidak boleh kosong!");
+        return;
+      }
+      if (qtyBeli === 0 && qtyFree === 0) {
+        alert("Minimal isi salah satu Qty!");
+        return;
       }
 
-      // 2. REGEX POLA SAKTI UNTUK PRODUK AERIS
-      // Mencari pola: (Nama Produk) -> (Qty) -> Rp -> (Harga) -> (Diskon %)
-      // Contoh match: Bubah 2.0 Merlot Complete Set 36 Rp 450.000 30%
-      const itemRegex = /([A-Za-z0-9\s\-\.\(\)\/,]+?)\s+(\d+)\s+Rp\s*[\d\.,]+\s+(\d+)%/g;
-      
-      let match;
-      let groupedProducts = {};
-
-      while ((match = itemRegex.exec(text)) !== null) {
-        let rawDesc = match[1].trim();
-        let qty = parseInt(match[2]) || 1;
-        let discount = parseInt(match[3]) || 0;
-
-        // Bersihkan sampah kata di depan nama produk jika ada
-        rawDesc = rawDesc
-          .replace(/^.*?(\d+\s+)?(Bubah|Blendie|Coral|Onyx|Triple|Cloud|Velvet|AERIS|Set|Brush)/i, '$2')
-          .replace(/^(PCS|UNIT|BOX)\s+/i, '')
-          .trim();
-
-        if (rawDesc.length > 2 && !rawDesc.includes("Ketentuan") && !rawDesc.includes("Subtotal")) {
-          if (!groupedProducts[rawDesc]) {
-            groupedProducts[rawDesc] = { desc: rawDesc, qtyBeli: 0, qtyFree: 0 };
-          }
-
-          if (discount === 100) {
-            groupedProducts[rawDesc].qtyFree += qty;
-          } else {
-            groupedProducts[rawDesc].qtyBeli += qty;
-          }
-        }
-      }
-
-      // 3. Susun data akhir
-      let finalItems = [];
-      let idx = 1;
-      for (let key in groupedProducts) {
-        finalItems.push({
-          no: idx++,
-          desc: key,
-          qtyBeli: groupedProducts[key].qtyBeli,
-          qtyFree: groupedProducts[key].qtyFree
+      // Cek apakah item sudah ada di list, kalau ada tambahkan Qty-nya
+      let existingItemIndex = globalItems.findIndex(i => i.desc.toLowerCase() === name.toLowerCase());
+      if (existingItemIndex >= 0) {
+        globalItems[existingItemIndex].qtyBeli += qtyBeli;
+        globalItems[existingItemIndex].qtyFree += qtyFree;
+      } else {
+        globalItems.push({
+          desc: name,
+          qtyBeli: qtyBeli,
+          qtyFree: qtyFree
         });
       }
 
-      updateDashboardUI(invoiceNo, finalItems);
+      closeManualModal();
+      renderDashboard(); // Update UI langsung
     }
 
-    function updateDashboardUI(invoiceNo, items) {
-      document.getElementById('invoiceNoHeader').innerText = invoiceNo;
-      document.getElementById('printInvoiceTitle').innerText = invoiceNo;
-      document.getElementById('uploadStatus').innerText = `Berhasil memuat: ${invoiceNo}`;
+    // FUNGSI RENDER KE LAYAR (UI DASHBOARD + UI PRINT)
+    function renderDashboard() {
+      document.getElementById('invoiceNoHeader').innerText = currentInvoiceNo;
+      document.getElementById('printInvoiceTitle').innerText = currentInvoiceNo;
 
       const prevTbody = document.getElementById('previewTbody');
       const printTbody = document.getElementById('printTbody');
@@ -263,28 +368,31 @@
 
       let totalUnitSum = 0;
 
-      if (items.length === 0) {
-        prevTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red; padding:20px;">Data tidak ditemukan. Pastikan file adalah Invoice resmi AERIS.</td></tr>`;
+      if (globalItems.length === 0) {
+        prevTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:20px;">Tabel kosong.</td></tr>`;
         return;
       }
 
-      items.forEach((item) => {
+      globalItems.forEach((item, index) => {
+        let noUrut = index + 1;
         let total = item.qtyBeli + item.qtyFree;
         totalUnitSum += total;
 
+        // Render Dashboard HTML
         prevTbody.innerHTML += `
           <tr>
-            <td>${item.no}</td>
+            <td>${noUrut}</td>
             <td>${item.desc}</td>
-            <td style="text-align: center;">${item.qtyBeli || '-'}</td>
-            <td style="text-align: center;">${item.qtyFree || '-'}</td>
+            <td style="text-align: center;">${item.qtyBeli > 0 ? item.qtyBeli : '-'}</td>
+            <td style="text-align: center;">${item.qtyFree > 0 ? item.qtyFree : '-'}</td>
             <td style="text-align: center; color: var(--aeris-primary); font-weight:700;">${total}</td>
           </tr>
         `;
 
+        // Render Cetak Kertas (Syarat No.5)
         printTbody.innerHTML += `
           <tr>
-            <td class="text-center">${item.no}</td>
+            <td class="text-center">${noUrut}</td>
             <td>${item.desc}</td>
             <td class="text-center">${item.qtyBeli > 0 ? item.qtyBeli : ''}</td>
             <td class="text-center">${item.qtyFree > 0 ? item.qtyFree : ''}</td>
@@ -294,7 +402,7 @@
       });
 
       document.getElementById('metricTotalUnit').innerText = totalUnitSum;
-      document.getElementById('metricSkuTypes').innerText = items.length;
+      document.getElementById('metricSkuTypes').innerText = globalItems.length;
     }
   </script>
 </body>
