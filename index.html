@@ -86,7 +86,7 @@
   <div class="app-container">
     <header class="header-section">
       <h1 class="brand-title">AERIS FULFILLMENT</h1>
-      <p class="sub-title">Smart Regex PDF Invoice Picking Generator</p>
+      <p class="sub-title">Precision PDF Invoice Picking Generator</p>
     </header>
 
     <div class="bento-grid">
@@ -94,7 +94,7 @@
         <div class="card-label">UPLOAD FILE PDF INVOICE</div>
         <div class="upload-zone">
           <p style="font-weight: 700; color: var(--text-dark); font-size:16px;">Klik atau Tarik File PDF Invoice ke Sini</p>
-          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Memproses PDF secara lokal</p>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Memproses PDF secara cepat & lokal</p>
           <input type="file" id="pdfFileInput" accept="application/pdf" onchange="processPDFLocally(event)">
         </div>
       </div>
@@ -111,7 +111,7 @@
 
       <div class="bento-card col-metric-4">
         <div class="card-label">SYSTEM STATUS</div>
-        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">PARSER READY</span></div>
+        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">ENGINE READY</span></div>
       </div>
 
       <div class="bento-card col-large">
@@ -243,14 +243,14 @@
       let invMatch = fullText.match(/RES-[0-9a-zA-Z\/\-\.\_\(\)]+/i);
       currentInvoiceNo = invMatch ? invMatch[0].trim() : "RES-INVOICE";
 
-      // 2. Isolasi Tabel Produk (Mulai dari Description sampai Subtotal)
+      // 2. Isolasi Tabel Produk
       let inTable = false;
       let tableLines = [];
 
       lines.forEach(line => {
         let l = line.toLowerCase();
 
-        if (l.includes("description") && (l.includes("qty") || l.includes("retail"))) {
+        if (l.includes("description") && (l.includes("qty") || l.includes("retail") || l.includes("price"))) {
           inTable = true;
           return;
         }
@@ -265,7 +265,7 @@
         }
       });
 
-      // 3. PARSING ULTRA AKURAT DENGAN BUFFERING
+      // 3. PARSING TERTIB TANPA TERTANGKAP BARCODE
       let parsedProducts = [];
       let currentItem = null;
 
@@ -273,43 +273,40 @@
         let l = line.toLowerCase();
         if (l.includes("page") || l.startsWith("total")) return;
 
-        // Cek apakah ada diskon % atau format harga nominal di baris ini
         let hasPercent = line.includes("%");
         let hasRp = l.includes("rp");
 
-        // Pembersihan karakter sampah awal
+        // HAPUS TOTAL BARCODE (Angka 8-14 digit seperti 8994449502480) & NOMINAL HARGA KETAT
         let cleanLine = line
-          .replace(/[\-\–\—]+\s*Rp\s*[\-\–\—]+/gi, '') // Buang '-Rp --'
-          .replace(/\bRp\.?\s*[\d\.\,]+/gi, '')       // Buang nominal Rp
-          .replace(/[\-\–\—]{2,}/g, '')               // Buang strip ganda '--'
+          .replace(/\b\d{8,14}\b/g, '')               // BUANG BARCODE/EAN13
+          .replace(/[\-\–\—]+\s*Rp\s*[\-\–\—]+/gi, '') 
+          .replace(/\bRp\.?\s*[\d\.\,]+/gi, '')       
+          .replace(/[\-\–\—]{2,}/g, '')               
           .trim();
 
-        // Cari angka Qty dalam baris
-        let numbers = cleanLine.match(/\b([1-9]\d*)\b/g);
+        // Cari Angka QTY Murni (1 - 3 digit: 1 s/d 999)
+        let numbers = cleanLine.match(/\b([1-9]\d{0,2})\b/g);
         let validQty = null;
 
         if (numbers) {
-          // Filter angka yang masuk akal sebagai Qty (biasanya < 300)
-          let candidates = numbers.map(n => parseInt(n)).filter(n => n > 0 && n < 300);
+          let candidates = numbers.map(n => parseInt(n)).filter(n => n > 0 && n < 500);
           if (candidates.length > 0) {
-            // Ambil angka pertama yang valid sebagai Qty
-            validQty = candidates[0];
+            validQty = candidates[0]; // Ambil Qty asli
           }
         }
 
-        // Kriteria Baris Utama: Punya Qty + Punya (%) ATAU harga Rp
+        // Kriteria Baris Utama
         if (validQty !== null && (hasPercent || hasRp)) {
           if (currentItem) parsedProducts.push(currentItem);
 
           let isFree = cleanLine.includes("100%");
 
-          // Buang nomor urut paling kiri di awal string
           let descText = cleanLine
             .replace(/^\d+[\s\.\-]+/, '')            // Buang nomor urut awal
-            .replace(/\b[1-9]\d*\b/g, '')             // Buang angka Qty
+            .replace(/\b[1-9]\d{0,2}\b/g, '')         // Buang angka Qty
             .replace(/\d+%/g, '')                    // Buang %
-            .replace(/[\-\–\—]+/g, ' ')               // Ganti strip jadi spasi
-            .replace(/\s+/g, ' ')                    // Rapikan spasi
+            .replace(/[\-\–\—]+/g, ' ')               
+            .replace(/\s+/g, ' ')                    
             .trim();
 
           currentItem = {
@@ -319,10 +316,10 @@
           };
         } 
         else {
-          // Baris ini adalah Sambungan Nama Produk di bawahnya (seperti "Powder", "Liquid", "Medium")
+          // Baris Sambungan Nama Produk
           let subText = cleanLine
             .replace(/^\d+[\s\.\-]+/, '')
-            .replace(/\b[1-9]\d*\b/g, '')
+            .replace(/\b[1-9]\d{0,2}\b/g, '')
             .replace(/\d+%/g, '')
             .replace(/[\-\–\—]+/g, ' ')
             .replace(/\s+/g, ' ')
@@ -336,7 +333,7 @@
 
       if (currentItem) parsedProducts.push(currentItem);
 
-      // 4. GROUPING ITEM SEJENIS DAN CLEANING AKHIR
+      // 4. GROUPING FINAL
       let grouped = {};
 
       parsedProducts.forEach(p => {
