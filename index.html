@@ -3,10 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AERIS Fulfillment Dashboard</title>
+  <title>AERIS Fulfillment SaaS Dashboard</title>
+  
+  <!-- Font Modern Plus Jakarta Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <style>
     :root {
@@ -28,31 +30,37 @@
     .brand-title { color: var(--aeris-primary); font-weight: 800; font-size: 28px; letter-spacing: -0.5px; margin-bottom: 6px; }
     .sub-title { color: var(--text-muted); font-size: 14px; font-weight: 500; }
 
-    /* Bento Grid Layout */
+    /* Bento Grid */
     .bento-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; }
     .bento-card { background: var(--bg-surface); border-radius: 24px; padding: 24px; box-shadow: var(--shadow-soft); }
     .card-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
     .metric-value { font-size: 36px; font-weight: 800; color: var(--text-dark); line-height: 1.1; }
 
-    .col-12 { grid-column: span 12; }
-    .col-4 { grid-column: span 4; }
+    .col-large { grid-column: span 12; }
+    .col-metric-4 { grid-column: span 4; }
 
-    /* Giant Input Area */
-    .giant-input-wrapper { background: #F8FAFC; border-radius: 20px; padding: 16px 24px; border: 2px solid #E2E8F0; }
-    .giant-input-wrapper:focus-within { border-color: var(--aeris-primary); background: #FFF; }
-    .giant-input { width: 100%; border: none; background: transparent; outline: none; font-size: 18px; font-weight: 700; color: var(--text-dark); text-align: center; }
-
-    /* Button & Badge */
-    .btn-primary { background: var(--aeris-primary); color: #FFF; border: none; padding: 14px 28px; border-radius: 50px; font-weight: 700; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
-    .btn-primary:hover { background: var(--aeris-hover); }
+    /* Upload Zone */
+    .upload-zone {
+      border: 2px dashed #CBD5E1;
+      background: #F8FAFC;
+      border-radius: 20px;
+      padding: 28px;
+      text-align: center;
+      cursor: pointer;
+      position: relative;
+    }
+    .upload-zone:hover { border-color: var(--aeris-primary); background: #FFF5F5; }
+    .upload-zone input[type="file"] { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+    
     .status-badge { display: inline-block; padding: 6px 16px; border-radius: 50px; background-color: var(--badge-success-bg); color: var(--badge-success-text); font-size: 12px; font-weight: 700; }
+    .btn-primary { background: var(--aeris-primary); color: #FFFFFF; border: none; padding: 14px 28px; border-radius: 50px; font-weight: 700; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; }
+    .btn-primary:hover { background: var(--aeris-hover); }
 
-    /* Preview Table */
     .preview-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
     .preview-table th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); padding: 12px 16px; border-bottom: 2px solid #F1F5F9; text-align: left; }
     .preview-table td { padding: 14px 16px; font-size: 14px; font-weight: 600; border-bottom: 1px solid #F8FAFC; }
 
-    /* FIX CETAK GUDANG PRESI (BERSISIAN) */
+    /* CSS CETAK GUDANG (TABEL BERSISIAN PRESI) */
     #print-picking-area { display: none; }
 
     @media print {
@@ -72,44 +80,46 @@
   <div class="app-container">
     <header class="header-section">
       <h1 class="brand-title">AERIS FULFILLMENT</h1>
-      <p class="sub-title">Picking List Automation Dashboard</p>
+      <p class="sub-title">Automated PDF Invoice Extractor & Picking List Generator</p>
     </header>
 
     <div class="bento-grid">
       
-      <!-- INPUT INVOICE REFERENCE -->
-      <div class="bento-card col-12">
-        <div class="card-label">Nomor Invoice Reference</div>
-        <div class="giant-input-wrapper">
-          <input type="text" id="invoiceInput" class="giant-input" value="RES-01/210726/TD-INTIMAKEUP (PKU)" oninput="updateInvoiceTitle(this.value)">
+      <!-- UPLOAD CARD -->
+      <div class="bento-card col-large">
+        <div class="card-label">Upload File PDF Invoice</div>
+        <div class="upload-zone">
+          <p style="font-weight: 700; color: var(--text-dark);">Klik atau Tarik File PDF Invoice ke Sini</p>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Format file support: PDF Asli Invoice AERIS</p>
+          <input type="file" id="pdfFileInput" accept="application/pdf" onchange="handlePdfUpload(event)">
         </div>
       </div>
 
       <!-- METRICS -->
-      <div class="bento-card col-4">
+      <div class="bento-card col-metric-4">
         <div class="card-label">Total Unit Item</div>
-        <div class="metric-value" id="metricTotalUnit">217</div>
+        <div class="metric-value" id="metricTotalUnit">0</div>
       </div>
 
-      <div class="bento-card col-4">
+      <div class="bento-card col-metric-4">
         <div class="card-label">Variasi SKU</div>
-        <div class="metric-value" id="metricSkuTypes">21</div>
+        <div class="metric-value" id="metricSkuTypes">0</div>
       </div>
 
-      <div class="bento-card col-4">
-        <div class="card-label">Status System</div>
-        <div style="margin-top: 8px;"><span class="status-badge">READY TO PRINT</span></div>
+      <div class="bento-card col-metric-4">
+        <div class="card-label">System Status</div>
+        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">SYSTEM READY</span></div>
       </div>
 
-      <!-- PREVIEW TABLE & ACTION -->
-      <div class="bento-card col-12">
+      <!-- PREVIEW TABLE CARD -->
+      <div class="bento-card col-large">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <div>
-            <div class="card-label">Preview Data Picking List</div>
-            <h3 id="invoiceHeaderTitle" style="color: var(--text-dark); font-size: 18px;">RES-01/210726/TD-INTIMAKEUP (PKU)</h3>
+            <div class="card-label">No Invoice Reference</div>
+            <h3 id="invoiceNoHeader" style="color: var(--text-dark); font-size: 18px;">-</h3>
           </div>
           <button class="btn-primary" onclick="window.print()">
-            Cetak List Picking
+            Print List Picking
           </button>
         </div>
 
@@ -124,7 +134,13 @@
                 <th style="text-align: center;">Total</th>
               </tr>
             </thead>
-            <tbody id="previewTbody"></tbody>
+            <tbody id="previewTbody">
+              <tr>
+                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 32px;">
+                  Silakan upload file PDF Invoice untuk memproses data.
+                </td>
+              </tr>
+            </tbody>
           </table>
         </div>
       </div>
@@ -132,9 +148,9 @@
     </div>
   </div>
 
-  <!-- CONTAINER FORM PRINTOUT CETAK -->
+  <!-- PRINTOUT AREA -->
   <div id="print-picking-area">
-    <div class="print-header" id="printDocTitle">RES-01/210726/TD-INTIMAKEUP (PKU)</div>
+    <div class="print-header" id="printInvoiceTitle">RES-01/210726/TD-INTIMAKEUP (PKU)</div>
     <table class="print-table">
       <thead>
         <tr>
@@ -149,77 +165,202 @@
     </table>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
   <script>
-    // Data contoh terstruktur sempurna sesuai Faktur AERIS + Auto Grouping
-    const aerisPickingData = [
-      { no: 1, desc: "Bubah 2.0 Merlot Complete Set", qtyBeli: 36, qtyFree: 3 },
-      { no: 2, desc: "Bubah Individual (Merlot) - BBH01 Powder", qtyBeli: 12, qtyFree: 1 },
-      { no: 3, desc: "Bubah Individual (Merlot) - BBH02 Liquid", qtyBeli: 12, qtyFree: 1 },
-      { no: 4, desc: "Bubah Individual (Merlot) - BBH03 Cheek", qtyBeli: 12, qtyFree: 1 },
-      { no: 5, desc: "Bubah Individual (Merlot) - BBH04 Concealer", qtyBeli: 12, qtyFree: 1 },
-      { no: 6, desc: "Bubah Individual (Merlot) - BBH05 Multitasker", qtyBeli: 24, qtyFree: 2 },
-      { no: 7, desc: "Bubah Individual (Merlot) - BBH06 Flat Concealer", qtyBeli: 12, qtyFree: 1 },
-      { no: 8, desc: "Bubah Individual (Merlot) - BBH07 Nose Contour", qtyBeli: 12, qtyFree: 1 },
-      { no: 9, desc: "Bubah Individual (Merlot) - BBH08 Fluffy Blend", qtyBeli: 24, qtyFree: 2 },
-      { no: 10, desc: "Bubah Individual (Merlot) - BBH09 Crease Blend", qtyBeli: 24, qtyFree: 2 },
-      { no: 11, desc: "Bubah Individual (Merlot) - BBH10 Small Shader", qtyBeli: 12, qtyFree: 1 },
-      { no: 12, desc: "Bubah Individual (Merlot) - BBH11 Hypersharp Eyeliner", qtyBeli: 6, qtyFree: 0 },
-      { no: 13, desc: "Bubah Individual (Merlot) - BBH12 Pointed Detail", qtyBeli: 6, qtyFree: 0 },
-      { no: 14, desc: "Blendie Bar Signature - Blooming Rose", qtyBeli: 6, qtyFree: 0 },
-      { no: 15, desc: "Blendie Bar Signature - Lavender", qtyBeli: 6, qtyFree: 1 },
-      { no: 16, desc: "Coral Travel 7 Set", qtyBeli: 12, qtyFree: 1 },
-      { no: 17, desc: "Onyx 15 Set", qtyBeli: 12, qtyFree: 1 },
-      { no: 18, desc: "Triple Duty Powder Puff - Gray, Medium", qtyBeli: 12, qtyFree: 1 },
-      { no: 19, desc: "Triple Duty Powder Puff - Pink, Medium", qtyBeli: 12, qtyFree: 1 },
-      { no: 20, desc: "Cloud Conceal Puff Signature - Marshmallow Creme", qtyBeli: 12, qtyFree: 1 }
-    ];
-
-    function updateInvoiceTitle(val) {
-      document.getElementById('invoiceHeaderTitle').innerText = val;
-      document.getElementById('printDocTitle').innerText = val;
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
     }
 
-    function renderDashboard() {
+    // FUNGSI NORMALISASI TEKS (MENGHAPUS SIMBOL STRIP ANEH / EN-DASH)
+    function sanitizeText(str) {
+      if (!str) return "";
+      return str
+        .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212\uFF0D\uFF1A\uFF65\uFFFD]/g, '-') // Ubah semua karakter strip aneh menjadi '-' biasa
+        .replace(/[^\x00-\x7F]/g, " ") // Hapus karakter non-ASCII yang merusak
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    async function handlePdfUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      document.getElementById('uploadStatus').innerText = `Memproses file: ${file.name}...`;
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        
+        let allItems = [];
+
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          
+          let pageItems = textContent.items.map(item => ({
+            str: sanitizeText(item.str), // Bersihkan setiap kata
+            x: item.transform[4],
+            y: item.transform[5]
+          }));
+
+          allItems = allItems.concat(pageItems);
+        }
+
+        parseAerisPdfInvoice(allItems);
+
+      } catch (err) {
+        console.error(err);
+        alert('Gagal membaca file PDF.');
+      }
+    }
+
+    function parseAerisPdfInvoice(textItems) {
+      // 1. Dapatkan Seluruh Teks Bersih
+      let fullText = textItems.map(x => x.str).join(" ");
+      
+      // 2. Ekstrak Nomor Invoice/PO Lengkap
+      let invoiceNo = "RES-INVOICE";
+      let invoiceMatch = fullText.match(/RES-[A-Za-z0-9\/\-\s\(\)]+/i);
+      if (invoiceMatch) {
+        invoiceNo = invoiceMatch[0].split(" Date")[0].split(" INVOICE")[0].trim();
+      }
+
+      // 3. Kelompokkan Kata berdasarkan Posisi Baris (Y-Coordinate)
+      let rowGroups = {};
+      textItems.forEach(item => {
+        if (!item.str) return;
+
+        let yKey = Object.keys(rowGroups).find(y => Math.abs(parseFloat(y) - item.y) < 4.0);
+        if (!yKey) {
+          yKey = item.y.toString();
+          rowGroups[yKey] = [];
+        }
+        rowGroups[yKey].push(item);
+      });
+
+      let sortedYKeys = Object.keys(rowGroups).sort((a, b) => parseFloat(b) - parseFloat(a));
+
+      let rawRows = [];
+      sortedYKeys.forEach(y => {
+        let itemsInRow = rowGroups[y].sort((a, b) => a.x - b.x);
+        let lineText = itemsInRow.map(i => i.str).join(" ").trim();
+        if (lineText) rawRows.push(lineText);
+      });
+
+      // 4. Extract dan Grouping Item (Pemisahan Qty Beli & Qty Free)
+      let groupedProducts = {};
+
+      for (let i = 0; i < rawRows.length; i++) {
+        let line = rawRows[i];
+
+        // Stop jika sudah masuk bagian Footer / Ketentuan Pembayaran
+        if (line.includes("Ketentuan Pembayaran") || line.includes("Terbilang") || line.includes("Syarat dan Ketentuan")) {
+          break;
+        }
+
+        // Cek baris yang mengandung Diskon % (misal: 30%, 25%, 100%)
+        if (line.includes("%")) {
+          let isFree = line.includes("100%");
+          
+          // Ambil Qty
+          let qty = 1;
+          let qtyMatch = line.match(/\b(\d+)\s+Rp/);
+          if (qtyMatch) {
+            qty = parseInt(qtyMatch[1]) || 1;
+          } else {
+            let numMatches = line.match(/\b\d+\b/g);
+            if (numMatches && numMatches.length > 1) {
+              qty = parseInt(numMatches[1]) || 1;
+            }
+          }
+
+          // Ambil Nama Deskripsi Produk
+          let desc = line
+            .replace(/^\d+\s+/, '') // Hapus no urut
+            .replace(/\s+\d+\s+Rp.*/, '') // Hapus bagian harga
+            .replace(/\s+\d+%\s+.*/, '') // Hapus diskon
+            .replace(/-?\s*Rp.*/i, '')
+            .trim();
+
+          // Penggabungan jika nama produk terpotong ke baris atasnya (multiline PDF)
+          if (i > 0 && !rawRows[i-1].includes("%") && !rawRows[i-1].includes("INVOICE") && !rawRows[i-1].includes("No")) {
+            let prevText = rawRows[i-1].trim();
+            if (!prevText.match(/^\d+$/) && !prevText.includes("AERIS") && !prevText.includes("Toko") && !prevText.includes("Date")) {
+               desc = prevText + " " + desc;
+            }
+          }
+
+          if (desc && desc.length > 2) {
+            if (!groupedProducts[desc]) {
+              groupedProducts[desc] = { desc: desc, qtyBeli: 0, qtyFree: 0 };
+            }
+
+            if (isFree) {
+              groupedProducts[desc].qtyFree += qty;
+            } else {
+              groupedProducts[desc].qtyBeli += qty;
+            }
+          }
+        }
+      }
+
+      // 5. Format Output Final Array
+      let finalItems = [];
+      let index = 1;
+
+      for (let key in groupedProducts) {
+        finalItems.push({
+          no: index++,
+          desc: key,
+          qtyBeli: groupedProducts[key].qtyBeli,
+          qtyFree: groupedProducts[key].qtyFree
+        });
+      }
+
+      updateDashboardUI(invoiceNo, finalItems);
+    }
+
+    function updateDashboardUI(invoiceNo, items) {
+      document.getElementById('invoiceNoHeader').innerText = invoiceNo;
+      document.getElementById('printInvoiceTitle').innerText = invoiceNo;
+      document.getElementById('uploadStatus').innerText = `Berhasil memuat invoice: ${invoiceNo}`;
+
       const prevTbody = document.getElementById('previewTbody');
       const printTbody = document.getElementById('printTbody');
-      
+
       prevTbody.innerHTML = '';
       printTbody.innerHTML = '';
 
-      let totalUnit = 0;
+      let totalUnitSum = 0;
 
-      aerisPickingData.forEach((item) => {
-        let grand = item.qtyBeli + item.qtyFree;
-        totalUnit += grand;
+      items.forEach((item) => {
+        let total = item.qtyBeli + item.qtyFree;
+        totalUnitSum += total;
 
-        // Tampilan Web
         prevTbody.innerHTML += `
           <tr>
             <td>${item.no}</td>
             <td>${item.desc}</td>
             <td style="text-align: center;">${item.qtyBeli || '-'}</td>
             <td style="text-align: center;">${item.qtyFree || '-'}</td>
-            <td style="text-align: center; color: var(--aeris-primary); font-weight:700;">${grand}</td>
+            <td style="text-align: center; color: var(--aeris-primary); font-weight:700;">${total}</td>
           </tr>
         `;
 
-        // Tampilan Cetak (Print Target)
         printTbody.innerHTML += `
           <tr>
             <td class="text-center">${item.no}</td>
             <td>${item.desc}</td>
             <td class="text-center">${item.qtyBeli > 0 ? item.qtyBeli : ''}</td>
             <td class="text-center">${item.qtyFree > 0 ? item.qtyFree : ''}</td>
-            <td class="text-center">${grand}</td>
+            <td class="text-center">${total}</td>
           </tr>
         `;
       });
 
-      document.getElementById('metricTotalUnit').innerText = totalUnit;
-      document.getElementById('metricSkuTypes').innerText = aerisPickingData.length;
+      document.getElementById('metricTotalUnit').innerText = totalUnitSum;
+      document.getElementById('metricSkuTypes').innerText = items.length;
     }
-
-    window.onload = renderDashboard;
   </script>
 </body>
 </html>
