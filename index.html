@@ -111,7 +111,7 @@
 
       <div class="bento-card col-metric-4">
         <div class="card-label">SYSTEM STATUS</div>
-        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">ENGINE READY</span></div>
+        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">SPATIAL PARSER READY</span></div>
       </div>
 
       <div class="bento-card col-large">
@@ -195,6 +195,17 @@
     let currentInvoiceNo = "-";
     let globalItems = [];
 
+    // FUNGSI HYGIENE STRINGS (Hapus Karakter Font Aneh / Ligatur PDF)
+    function sanitizeFontGarbage(str) {
+      if (!str) return "";
+      return str
+        .replace(/[\u0250-\u02AF\u0370-\u03FF]/g, '-') // Convert simbol Yunani/IPA (seperti ɮ, γ) jadi dash '-'
+        .replace(/\bcMERLOT\b/gi, 'MERLOT')             // Fix typo ligatur PDF
+        .replace(/[%]/g, '')                            // Hapus simbol %
+        .replace(/\s+/g, ' ')                          // Normalize spasi
+        .trim();
+    }
+
     async function processPDFLocally(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -205,29 +216,27 @@
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         
-        let allLines = [];
+        let allTokens = [];
 
         for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
           const page = await pdf.getPage(pageNum);
           const textContent = await page.getTextContent();
           
-          let linesByY = {};
           textContent.items.forEach(item => {
-            let y = Math.round(item.transform[5]);
-            if (!linesByY[y]) linesByY[y] = [];
-            linesByY[y].push(item.str);
-          });
-
-          let sortedY = Object.keys(linesByY).sort((a, b) => b - a);
-          sortedY.forEach(y => {
-            let lineStr = linesByY[y].join(" ").trim();
-            if (lineStr.length > 0) {
-              allLines.push(lineStr);
+            let cleanStr = sanitizeFontGarbage(item.str);
+            if (cleanStr.length > 0) {
+              allTokens.push({
+                str: cleanStr,
+                rawStr: item.str,
+                x: Math.round(item.transform[4]),
+                y: Math.round(item.transform[5]),
+                page: pageNum
+              });
             }
           });
         }
 
-        parseAerisPerfect(allLines, file.name);
+        parseAerisSpatialStrict(allTokens, file.name);
         document.getElementById('uploadStatus').innerText = `Selesai: ${file.name}`;
 
       } catch (err) {
@@ -236,120 +245,101 @@
       }
     }
 
-    function parseAerisPerfect(lines, fileName) {
-      let fullText = lines.join("\n");
-
-      // 1. Dapatkan Nomor Invoice Utuh (termasuk suffix -BELIA, -PKU, dll)
-      let invMatch = fullText.match(/RES-[0-9a-zA-Z\/\-\_\.]+/i);
-      if (invMatch) {
-        currentInvoiceNo = invMatch[0].trim().replace(/[\.\,\_]+$/, '');
+    function parseAerisSpatialStrict(tokens, fileName) {
+      // 1. Tangkap Nomor Invoice (Gabungkan token dulu)
+      let fullText = tokens.map(t => t.str).join(" ");
+      let invMatch = fullText.match(/RES-[0-9a-zA-Z\/\-\_]+/i);
+      
+      if (invMatch && invMatch[0].length > 10) {
+        currentInvoiceNo = invMatch[0].replace(/-/g, '-').trim();
       } else {
         // Fallback dari nama file kalau di PDF terpotong
-        let fnameMatch = fileName.match(/RES-[0-9a-zA-Z\/\-\_\.]+/i);
-        currentInvoiceNo = fnameMatch ? fnameMatch[0].replace('.pdf','').replace(/_/g, '/') : "RES-INVOICE";
+        let cleanFName = fileName.replace('.pdf','').replace(/_/g, '/');
+        let fMatch = cleanFName.match(/RES-[0-9a-zA-Z\/\-]+/i);
+        currentInvoiceNo = fMatch ? fMatch[0] : "RES-INVOICE";
       }
 
-      // 2. Isolasi Tabel Produk
-      let inTable = false;
-      let tableLines = [];
+      // Fix tampilan dash di invoice header jika masih ada 'ɮ'
+      currentInvoiceNo = currentInvoiceNo.replace(/ɮ/g, '-').replace(/γ/g, '-');
 
-      lines.forEach(line => {
-        let l = line.toLowerCase();
+      // 2. Filter Token Hanya Di Area Tabel Invoice
+      let descHeader = tokens.find(t => t.str.toLowerCase() === "description");
+      let subtotalFooter = tokens.find(t => t.str.toLowerCase().includes("subtotal") || t.str.toLowerCase().includes("terbilang"));
 
-        if (l.includes("description") && (l.includes("qty") || l.includes("retail") || l.includes("price") || l.includes("unit"))) {
-          inTable = true;
-          return;
-        }
+      let minY = subtotalFooter ? subtotalFooter.y : 0;
+      let maxY = descHeader ? descHeader.y : 9999;
 
-        if (
-          l.includes("subtotal") || 
-          l.includes("total amount") || 
-          l.includes("terbilang") || 
-          l.includes("ketentuan") || 
-          l.includes("diterima") || 
-          l.startsWith("total ")
-        ) {
-          inTable = false;
-          return;
-        }
+      let tableTokens = tokens.filter(t => t.y < maxY && t.y > minY);
 
-        if (inTable) {
-          tableLines.push(line);
-        }
+      // 3. Kelompokkan Elemen Berdasarkan Baris Y (Toleransi 5px)
+      let rowGroups = {};
+      tableTokens.forEach(t => {
+        let matchedY = Object.keys(rowGroups).find(y => Math.abs(y - t.y) <= 5);
+        if (!matchedY) matchedY = t.y;
+
+        if (!rowGroups[matchedY]) rowGroups[matchedY] = [];
+        rowGroups[matchedY].push(t);
       });
 
-      // 3. PARSING TANPA INDEKS TABEL & BEBAS SIMBOL ANEH
+      let sortedY = Object.keys(rowGroups).sort((a, b) => b - a);
+
       let parsedProducts = [];
       let currentItem = null;
 
-      tableLines.forEach(line => {
-        let l = line.toLowerCase();
-        if (l.includes("page") || l.startsWith("total ")) return;
+      sortedY.forEach(y => {
+        let row = rowGroups[y].sort((a, b) => a.x - b.x);
+        let rowLineText = row.map(t => t.str).join(" ");
 
-        let isFree = line.includes("100%");
-        let hasRp = l.includes("rp");
+        // Abaikan baris total / terbilang di footer
+        if (rowLineText.toLowerCase().includes("terbilang") || rowLineText.toLowerCase().startsWith("total ")) return;
 
-        // Step A: Hapus Barcode (EAN13), Rp, % dan simbol aneh (γ)
-        let clean = line
-          .replace(/\b\d{8,14}\b/g, '')               // Hapus Barcode
-          .replace(/[\-\–\—]+\s*Rp\s*[\-\–\—]+/gi, '') 
-          .replace(/\bRp\.?\s*[\d\.\,]+/gi, '')       
-          .replace(/[%γ\-\–\—]/g, ' ')                // Hapus %, γ, strip
-          .replace(/\bcMERLOT\b/gi, 'MERLOT')         // Perbaiki typo font PDF
-          .replace(/\s+/g, ' ')                       
-          .trim();
+        // PEMISAHAN SPASIAL KOORDINAT X:
+        // x < 80   : NOMOR URUT TABEL (DIBUANG KETAT!)
+        // 80 - 320 : NAMA / DESKRIPSI PRODUK
+        // 320 - 420: QTY
+        // > 420    : HARGA / DISKON / 100%
 
-        // Step B: BUANG NOMOR URUT PADA AWAL STRINGS (1., 2., 15., dst)
-        clean = clean.replace(/^\d+[\s\.\-]+/, '').trim();
+        let descTokens = row.filter(t => t.x >= 80 && t.x <= 320);
+        let qtyTokens  = row.filter(t => t.x > 320 && t.x <= 420);
+        let discTokens = row.filter(t => t.x > 420);
 
-        // Step C: Cari Angka QTY Murni (1 s/d 999)
-        let numbers = clean.match(/\b([1-9]\d{0,2})\b/g);
-        let validQty = null;
+        let descStr = descTokens.map(t => t.str).join(" ").trim();
+        let qtyStr  = qtyTokens.map(t => t.str).join(" ").trim();
+        let discStr = discTokens.map(t => t.str).join(" ").trim();
 
-        if (numbers) {
-          // Ambil angka pertama yang valid sebagai Qty
-          let candidates = numbers.map(n => parseInt(n)).filter(n => n > 0 && n < 300);
-          if (candidates.length > 0) {
-            validQty = candidates[0];
-          }
-        }
+        // Cari angka Qty valid di kolom Qty (x > 320)
+        let qtyMatch = qtyStr.match(/\b([1-9]\d{0,2})\b/);
+        let validQty = qtyMatch ? parseInt(qtyMatch[0]) : null;
 
-        // Kriteria Baris Utama
-        if (validQty !== null && (isFree || hasRp || line.includes("%"))) {
+        let isFree = discStr.includes("100%") || rowLineText.includes("100%");
+
+        if (validQty !== null) {
+          // Baris Utama Baru
           if (currentItem) parsedProducts.push(currentItem);
 
-          let descText = clean
-            .replace(/\b[1-9]\d{0,2}\b/g, '') // Buang Qty dari string deskripsi
-            .replace(/\s+/g, ' ')
-            .trim();
-
           currentItem = {
-            desc: descText,
+            desc: descStr,
             qty: validQty,
             isFree: isFree
           };
-        } 
-        else {
-          // Sambungan Nama Produk Multiline
-          let subText = clean
-            .replace(/\b[1-9]\d{0,2}\b/g, '')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-          if (currentItem && subText.length > 0 && !subText.toLowerCase().startsWith("total") && !subText.toLowerCase().includes("terbilang")) {
-            currentItem.desc += " " + subText;
+        } else {
+          // Sambungan Deskripsi Multiline
+          if (currentItem && descStr.length > 0) {
+            currentItem.desc += " " + descStr;
           }
         }
       });
 
       if (currentItem) parsedProducts.push(currentItem);
 
-      // 4. GROUPING ITEM & AKHIR
+      // 4. GROUPING ITEM & STERILISASI AKHIR
       let grouped = {};
 
       parsedProducts.forEach(p => {
         let name = p.desc
-          .replace(/\bRp\b/gi, '')
+          .replace(/[\-\–\—]{2,}/g, '-')
+          .replace(/^-+\s*/, '')
+          .replace(/\s+-+$/, '')
           .replace(/\s+/g, ' ')
           .trim();
 
