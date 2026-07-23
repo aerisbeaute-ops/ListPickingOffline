@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AERIS Fulfillment SaaS Dashboard</title>
   
-  <!-- Font Modern Plus Jakarta Sans -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -30,16 +29,14 @@
     .brand-title { color: var(--aeris-primary); font-weight: 800; font-size: 28px; letter-spacing: -0.5px; margin-bottom: 6px; }
     .sub-title { color: var(--text-muted); font-size: 14px; font-weight: 500; }
 
-    /* Bento Grid Layout */
     .bento-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 20px; }
     .bento-card { background: var(--bg-surface); border-radius: 24px; padding: 24px; box-shadow: var(--shadow-soft); }
-    .card-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+    .card-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); margin-bottom: 8px; }
     .metric-value { font-size: 36px; font-weight: 800; color: var(--text-dark); line-height: 1.1; }
 
     .col-large { grid-column: span 12; }
     .col-metric-4 { grid-column: span 4; }
 
-    /* Upload Zone Styling */
     .upload-zone {
       border: 2px dashed #CBD5E1;
       background: #F8FAFC;
@@ -48,23 +45,18 @@
       text-align: center;
       cursor: pointer;
       position: relative;
-      transition: all 0.2s ease;
     }
     .upload-zone:hover { border-color: var(--aeris-primary); background: #FFF5F5; }
     .upload-zone input[type="file"] { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
-    .upload-icon { width: 40px; height: 40px; stroke: var(--aeris-primary); margin-bottom: 8px; }
 
-    /* Button & Badge */
     .status-badge { display: inline-block; padding: 6px 16px; border-radius: 50px; background-color: var(--badge-success-bg); color: var(--badge-success-text); font-size: 12px; font-weight: 700; }
-    .btn-primary { background: var(--aeris-primary); color: #FFFFFF; border: none; padding: 14px 28px; border-radius: 50px; font-weight: 700; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 10px; }
-    .btn-primary:hover { background: var(--aeris-hover); }
+    .btn-primary { background: var(--aeris-primary); color: #FFFFFF; border: none; padding: 14px 28px; border-radius: 50px; font-weight: 700; font-size: 14px; cursor: pointer; }
 
-    /* Table Preview */
     .preview-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
     .preview-table th { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); padding: 12px 16px; border-bottom: 2px solid #F1F5F9; text-align: left; }
     .preview-table td { padding: 14px 16px; font-size: 14px; font-weight: 600; border-bottom: 1px solid #F8FAFC; }
 
-    /* CSS PRINT DRIVER OVERRIDE (PRINTOUT BERSISIAN PRESI) */
+    /* LAYOUT PRINT GUDANG BERSISIAN PRESI */
     #print-picking-area { display: none; }
 
     @media print {
@@ -89,21 +81,15 @@
 
     <div class="bento-grid">
       
-      <!-- UPLOAD FILE CARD -->
       <div class="bento-card col-large">
-        <div class="card-label">
-          <svg class="icon-svg" style="width:16px; height:16px; stroke:var(--aeris-primary); fill:none;" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" stroke-width="2" stroke-linecap="round"/></svg>
-          Upload File PDF Invoice
-        </div>
+        <div class="card-label">Upload File PDF Invoice</div>
         <div class="upload-zone">
-          <svg class="upload-icon" viewBox="0 0 24 24" fill="none"><path d="M7 16a4 4 0 01-.88-7.903A5 5 0 0115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
           <p style="font-weight: 700; color: var(--text-dark); font-size:16px;">Klik atau Tarik File PDF Invoice ke Sini</p>
           <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Format disarankan: PDF Asli Invoice AERIS</p>
           <input type="file" id="pdfFileInput" accept="application/pdf" onchange="handlePdfUpload(event)">
         </div>
       </div>
 
-      <!-- METRICS -->
       <div class="bento-card col-metric-4">
         <div class="card-label">Total Unit Item</div>
         <div class="metric-value" id="metricTotalUnit">0</div>
@@ -119,7 +105,6 @@
         <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">SYSTEM READY</span></div>
       </div>
 
-      <!-- PREVIEW TABLE CARD -->
       <div class="bento-card col-large">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
           <div>
@@ -127,7 +112,7 @@
             <h3 id="invoiceNoHeader" style="color: var(--text-dark); font-size: 18px;">-</h3>
           </div>
           <button class="btn-primary" onclick="window.print()">
-            Cetak List Picking
+            Print List Picking
           </button>
         </div>
 
@@ -156,9 +141,8 @@
     </div>
   </div>
 
-  <!-- PRINTOUT AREA -->
   <div id="print-picking-area">
-    <div class="print-header" id="printInvoiceTitle">RES-01/210726/TD-INTIMAKEUP (PKU)</div>
+    <div class="print-header" id="printInvoiceTitle">RES-INVOICE</div>
     <table class="print-table">
       <thead>
         <tr>
@@ -179,138 +163,84 @@
       pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
     }
 
-    // SANITIZE ENCODING TEKS UNTUK PERBAIKAN DASH (-) & SYMBOL ANEH
-    function sanitizeText(str) {
-      if (!str) return "";
-      return str
-        .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212\uFF0D\uFF1A\uFF65\uFFFD]/g, '-')
-        .replace(/[^\x00-\x7F]/g, " ")
-        .replace(/\s+/g, ' ')
-        .trim();
-    }
-
     async function handlePdfUpload(event) {
       const file = event.target.files[0];
       if (!file) return;
 
-      document.getElementById('uploadStatus').innerText = `Memproses file: ${file.name}...`;
+      document.getElementById('uploadStatus').innerText = `Memproses: ${file.name}...`;
 
       try {
         const arrayBuffer = await file.arrayBuffer();
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
         
-        let allItems = [];
+        let fullText = "";
 
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
           const textContent = await page.getTextContent();
-          
-          let pageItems = textContent.items.map(item => ({
-            str: sanitizeText(item.str),
-            x: item.transform[4],
-            y: item.transform[5]
-          }));
-
-          allItems = allItems.concat(pageItems);
+          const pageText = textContent.items.map(item => item.str).join(" ");
+          fullText += pageText + " ";
         }
 
-        parseAerisPdfInvoice(allItems);
+        // Normalisasi teks
+        fullText = fullText
+          .replace(/[\u2010\u2011\u2012\u2013\u2014\u2015\u2212\uFF0D]/g, '-')
+          .replace(/\s+/g, ' ');
+
+        parseAerisPdfInvoiceGlobal(fullText);
 
       } catch (err) {
         console.error(err);
-        alert('Gagal membaca file PDF.');
+        alert('Gagal membaca PDF.');
       }
     }
 
-    function parseAerisPdfInvoice(textItems) {
-      let fullText = textItems.map(x => x.str).join(" ");
-      
-      // Ambil No PO/Invoice secara utuh
+    function parseAerisPdfInvoiceGlobal(text) {
+      // 1. Ekstrak No Invoice
       let invoiceNo = "RES-INVOICE";
-      let invoiceMatch = fullText.match(/RES-[A-Za-z0-9\/\-\s\(\)]+/i);
-      if (invoiceMatch) {
-        invoiceNo = invoiceMatch[0].split(" Date")[0].split(" INVOICE")[0].trim();
+      let invMatch = text.match(/RES-[0-9a-zA-Z\/\-\s\(\)]+/i);
+      if (invMatch) {
+        invoiceNo = invMatch[0].split(" Date")[0].split(" Tanggal")[0].split(" INVOICE")[0].trim();
       }
 
-      // Kelompokkan baris berdasarkan posisi Y
-      let rowGroups = {};
-      textItems.forEach(item => {
-        if (!item.str) return;
-
-        let yKey = Object.keys(rowGroups).find(y => Math.abs(parseFloat(y) - item.y) < 4.0);
-        if (!yKey) {
-          yKey = item.y.toString();
-          rowGroups[yKey] = [];
-        }
-        rowGroups[yKey].push(item);
-      });
-
-      let sortedYKeys = Object.keys(rowGroups).sort((a, b) => parseFloat(b) - parseFloat(a));
-
-      let rawRows = [];
-      sortedYKeys.forEach(y => {
-        let itemsInRow = rowGroups[y].sort((a, b) => a.x - b.x);
-        let lineText = itemsInRow.map(i => i.str).join(" ").trim();
-        if (lineText) rawRows.push(lineText);
-      });
-
+      // 2. REGEX POLA SAKTI UNTUK PRODUK AERIS
+      // Mencari pola: (Nama Produk) -> (Qty) -> Rp -> (Harga) -> (Diskon %)
+      // Contoh match: Bubah 2.0 Merlot Complete Set 36 Rp 450.000 30%
+      const itemRegex = /([A-Za-z0-9\s\-\.\(\)\/,]+?)\s+(\d+)\s+Rp\s*[\d\.,]+\s+(\d+)%/g;
+      
+      let match;
       let groupedProducts = {};
 
-      for (let i = 0; i < rawRows.length; i++) {
-        let line = rawRows[i];
+      while ((match = itemRegex.exec(text)) !== null) {
+        let rawDesc = match[1].trim();
+        let qty = parseInt(match[2]) || 1;
+        let discount = parseInt(match[3]) || 0;
 
-        if (line.includes("Ketentuan Pembayaran") || line.includes("Terbilang") || line.includes("Syarat dan Ketentuan")) {
-          break;
-        }
+        // Bersihkan sampah kata di depan nama produk jika ada
+        rawDesc = rawDesc
+          .replace(/^.*?(\d+\s+)?(Bubah|Blendie|Coral|Onyx|Triple|Cloud|Velvet|AERIS|Set|Brush)/i, '$2')
+          .replace(/^(PCS|UNIT|BOX)\s+/i, '')
+          .trim();
 
-        if (line.includes("%")) {
-          let isFree = line.includes("100%");
-          
-          let qty = 1;
-          let qtyMatch = line.match(/\b(\d+)\s+Rp/);
-          if (qtyMatch) {
-            qty = parseInt(qtyMatch[1]) || 1;
+        if (rawDesc.length > 2 && !rawDesc.includes("Ketentuan") && !rawDesc.includes("Subtotal")) {
+          if (!groupedProducts[rawDesc]) {
+            groupedProducts[rawDesc] = { desc: rawDesc, qtyBeli: 0, qtyFree: 0 };
+          }
+
+          if (discount === 100) {
+            groupedProducts[rawDesc].qtyFree += qty;
           } else {
-            let numMatches = line.match(/\b\d+\b/g);
-            if (numMatches && numMatches.length > 1) {
-              qty = parseInt(numMatches[1]) || 1;
-            }
-          }
-
-          let desc = line
-            .replace(/^\d+\s+/, '')
-            .replace(/\s+\d+\s+Rp.*/, '')
-            .replace(/\s+\d+%\s+.*/, '')
-            .replace(/-?\s*Rp.*/i, '')
-            .trim();
-
-          if (i > 0 && !rawRows[i-1].includes("%") && !rawRows[i-1].includes("INVOICE") && !rawRows[i-1].includes("No")) {
-            let prevText = rawRows[i-1].trim();
-            if (!prevText.match(/^\d+$/) && !prevText.includes("AERIS") && !prevText.includes("Toko") && !prevText.includes("Date")) {
-               desc = prevText + " " + desc;
-            }
-          }
-
-          if (desc && desc.length > 2) {
-            if (!groupedProducts[desc]) {
-              groupedProducts[desc] = { desc: desc, qtyBeli: 0, qtyFree: 0 };
-            }
-
-            if (isFree) {
-              groupedProducts[desc].qtyFree += qty;
-            } else {
-              groupedProducts[desc].qtyBeli += qty;
-            }
+            groupedProducts[rawDesc].qtyBeli += qty;
           }
         }
       }
 
+      // 3. Susun data akhir
       let finalItems = [];
-      let index = 1;
-
+      let idx = 1;
       for (let key in groupedProducts) {
         finalItems.push({
-          no: index++,
+          no: idx++,
           desc: key,
           qtyBeli: groupedProducts[key].qtyBeli,
           qtyFree: groupedProducts[key].qtyFree
@@ -332,6 +262,11 @@
       printTbody.innerHTML = '';
 
       let totalUnitSum = 0;
+
+      if (items.length === 0) {
+        prevTbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:red; padding:20px;">Data tidak ditemukan. Pastikan file adalah Invoice resmi AERIS.</td></tr>`;
+        return;
+      }
 
       items.forEach((item) => {
         let total = item.qtyBeli + item.qtyFree;
