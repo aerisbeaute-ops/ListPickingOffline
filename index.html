@@ -86,7 +86,7 @@
   <div class="app-container">
     <header class="header-section">
       <h1 class="brand-title">AERIS FULFILLMENT</h1>
-      <p class="sub-title">Automated PDF Invoice Table Extractor</p>
+      <p class="sub-title">Automated PDF Invoice Table Extractor & Picking List Generator</p>
     </header>
 
     <div class="bento-grid">
@@ -95,7 +95,7 @@
         <div class="card-label">UPLOAD FILE PDF INVOICE</div>
         <div class="upload-zone">
           <p style="font-weight: 700; color: var(--text-dark); font-size:16px;">Klik atau Tarik File PDF Invoice ke Sini</p>
-          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Memproses tabel PDF secara langsung</p>
+          <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;" id="uploadStatus">Memproses tabel PDF secara langsung di browser</p>
           <input type="file" id="pdfFileInput" accept="application/pdf" onchange="processPDFLocally(event)">
         </div>
       </div>
@@ -112,7 +112,7 @@
 
       <div class="bento-card col-metric-4">
         <div class="card-label">SYSTEM STATUS</div>
-        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">PARSER READY</span></div>
+        <div style="margin-top: 8px;"><span class="status-badge" id="sysStatus">LOCAL PARSER READY</span></div>
       </div>
 
       <div class="bento-card col-large">
@@ -201,7 +201,7 @@
       const file = event.target.files[0];
       if (!file) return;
 
-      document.getElementById('uploadStatus').innerText = `Membaca ${file.name}...`;
+      document.getElementById('uploadStatus').innerText = `Membaca file ${file.name}...`;
 
       try {
         const arrayBuffer = await file.arrayBuffer();
@@ -230,7 +230,7 @@
         }
 
         parseAerisTableStrict(allLines);
-        document.getElementById('uploadStatus').innerText = `Selesai: ${file.name}`;
+        document.getElementById('uploadStatus').innerText = `Selesai mengekstrak: ${file.name}`;
 
       } catch (err) {
         console.error(err);
@@ -242,11 +242,11 @@
     function parseAerisTableStrict(lines) {
       let fullText = lines.join("\n");
 
-      // 1. Ekstrak No Invoice
+      // 1. Ekstrak No Invoice Resmi
       let invMatch = fullText.match(/RES-[0-9a-zA-Z\/\-\.\_\(\)]+/i);
       currentInvoiceNo = invMatch ? invMatch[0].trim() : "RES-INVOICE";
 
-      // 2. ISOLASI HANYA AREA TABEL PRODUK
+      // 2. ISOLASI HANYA AREA TABEL PRODUK (Skip header alamat & footer)
       let inTableZone = false;
       let rawTableLines = [];
 
@@ -254,13 +254,11 @@
         let line = lines[i].trim();
         let l = line.toLowerCase();
 
-        // Mulai jika ketemu Header Tabel
         if (l.includes("description") && (l.includes("qty") || l.includes("retail"))) {
           inTableZone = true;
           continue;
         }
 
-        // Stop jika ketemu Total / Subtotal / Ketentuan
         if (l.includes("subtotal") || l.includes("total amount") || l.includes("ketentuan") || l.includes("diterima oleh")) {
           inTableZone = false;
           break;
@@ -271,54 +269,88 @@
         }
       }
 
-      // 3. PARSING BARIS DETEKSI "Rp" & "%"
-      let groupedProducts = {};
-      let pendingDescPart = "";
+      // 3. LOGIKA PRESERVASI MULTI-LINE & EKSTRAKSI QTY
+      let parsedProducts = [];
+      let currentProduct = null;
 
       for (let i = 0; i < rawTableLines.length; i++) {
-        let line = rawTableLines[i];
+        let line = rawTableLines[i].trim();
+        let l = line.toLowerCase();
 
-        // Jika baris mengandung Rp (berarti baris utama item produk)
+        if (l.includes("page") || l.startsWith("total")) continue;
+
+        // Jika baris mengandung harga 'Rp' (Artinya baris utama transaksi)
         if (line.includes("Rp")) {
-          // Ambil persentase diskon
+          // Ambil % Diskon (100% = Free)
           let discMatch = line.match(/(\d+)%/);
           let discVal = discMatch ? parseInt(discMatch[1]) : 0;
-          let is100PercentFree = (discVal === 100);
+          let isFree = (discVal === 100);
 
-          // Ambil Qty (Angka pertama di baris ini)
-          let qtyMatch = line.match(/\b([1-9]\d*)\b/);
-          let qty = qtyMatch ? parseInt(qtyMatch[1]) : 1;
-          if (qty > 500) qty = 1; // Safeguard
+          // Ambil Qty: Cari angka SEBELUM 'Rp'
+          let beforeRp = line.split("Rp")[0];
+          let qtyMatches = beforeRp.match(/\b([1-9]\d*)\b/g);
+          let qty = 1;
 
-          // Ambil Nama Produk Utama (Teks sebelum angka Qty/Rp)
-          let mainDesc = line
-            .split("Rp")[0]
-            .replace(/\b[1-9]\d*\b.*/, '') // Potong angka Qty ke kanan
-            .trim();
-
-          // Jika ada teks gantung di baris sebelumnya (multiline), gabungkan!
-          let finalDesc = pendingDescPart ? `${pendingDescPart} ${mainDesc}` : mainDesc;
-          pendingDescPart = ""; // Reset
-
-          if (finalDesc.length > 2) {
-            if (!groupedProducts[finalDesc]) {
-              groupedProducts[finalDesc] = { desc: finalDesc, qtyBeli: 0, qtyFree: 0 };
-            }
-
-            if (is100PercentFree) {
-              groupedProducts[finalDesc].qtyFree += qty;
-            } else {
-              groupedProducts[finalDesc].qtyBeli += qty;
+          if (qtyMatches && qtyMatches.length > 0) {
+            // Ambil angka terakhir sebelum Rp (karena angka paling awal biasa nomor urut tabel)
+            let candidateQty = parseInt(qtyMatches[qtyMatches.length - 1]);
+            if (candidateQty > 0 && candidateQty < 500) {
+              qty = candidateQty;
             }
           }
+
+          // Bersihkan teks nama produk dari nomor urut & angka gantung
+          let cleanTitle = beforeRp
+            .replace(/^\d+[\s\.\-]+/, '')
+            .replace(/\b[1-9]\d*\b/g, '')
+            .replace(/---\s*\d*/g, '')
+            .trim();
+
+          if (currentProduct) {
+            parsedProducts.push(currentProduct);
+          }
+
+          currentProduct = {
+            desc: cleanTitle,
+            qty: qty,
+            isFree: isFree
+          };
         } 
         else {
-          // Jika baris TIDAK punya Rp (Kemungkinan sambungan nama produk seperti "Powder", "Liquid", "Cheek")
-          if (!line.toLowerCase().includes("page")) {
-            pendingDescPart = line.trim();
+          // Jika baris TIDAK ada 'Rp', ini adalah SAMBUNGAN NAMA PRODUK dari baris atasnya (seperti "Powder", "Soda")
+          let cleanSubTitle = line
+            .replace(/^\d+[\s\.\-]+/, '')
+            .replace(/\b[1-9]\d*\b/g, '')
+            .trim();
+
+          if (currentProduct && cleanSubTitle.length > 0) {
+            currentProduct.desc += " " + cleanSubTitle;
           }
         }
       }
+
+      if (currentProduct) {
+        parsedProducts.push(currentProduct);
+      }
+
+      // 4. GROUPING PRODUK SEJENIS & PENJUMLAHAN QTY
+      let groupedProducts = {};
+
+      parsedProducts.forEach(prod => {
+        let finalDesc = prod.desc.replace(/\s+/g, ' ').trim();
+
+        if (finalDesc.length > 2) {
+          if (!groupedProducts[finalDesc]) {
+            groupedProducts[finalDesc] = { desc: finalDesc, qtyBeli: 0, qtyFree: 0 };
+          }
+
+          if (prod.isFree) {
+            groupedProducts[finalDesc].qtyFree += prod.qty;
+          } else {
+            groupedProducts[finalDesc].qtyBeli += prod.qty;
+          }
+        }
+      });
 
       globalItems = Object.values(groupedProducts);
       renderDashboard();
